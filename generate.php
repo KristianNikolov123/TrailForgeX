@@ -1,5 +1,30 @@
 <?php
+$route = null;
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // Geocoding will be handled by JavaScript, but we can keep PHP fallback
+    $payload = [
+        "start_lat" => floatval($_POST["start_lat"] ?? 42.6977),
+        "start_lng" => floatval($_POST["start_lng"] ?? 23.3219),
+        "end_lat"   => !empty($_POST["end_lat"]) ? floatval($_POST["end_lat"]) : null,
+        "end_lng"   => !empty($_POST["end_lng"]) ? floatval($_POST["end_lng"]) : null,
+        "distance_km" => floatval($_POST["distance"] ?? 5),
+        "elevation_gain_target" => !empty($_POST["elevation_gain"]) ? floatval($_POST["elevation_gain"]) : null,
+        "prefer" => $_POST["prefer"] ?? "green"
+    ];
+
+    $ch = curl_init("http://localhost:8000/generate");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $route = json_decode($response, true);
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +35,7 @@
 </head>
 <body>
     <header>
-        <div class="logo"><img src="TrailForgeX_logo-removebg-preview.png" alt="TrailForgeX Logo" style="height:64px"></div>
+        <div class="logo"><img src="TrailForgeX-logo.png" alt="TrailForgeX Logo" style="height:64px"></div>
         <nav>
             <ul>
                 <li><a href="index.php">Home</a></li>
@@ -34,20 +59,47 @@
             <div style="flex:1;min-width:250px;">
                 <h2 style="color:#ea5f94;text-align:center;font-size:2rem;">Personalized Route Generator</h2>
                 <p style="color:#e6bfd6;text-align:center;">Choose your starting point, distance, and receive a dynamically crafted trail.</p>
-                <form class="gen-form">
-                    <label for="start">Start:</label>
-                    <input type="text" id="start" name="start" placeholder="Enter your start (e.g., City Park)">
+                <form class="gen-form" method="POST" action="" id="routeForm">
+                    <label for="start">Start Location:</label>
+                    <input type="text" id="start" name="start" placeholder="Enter address or place name" required>
+                    <input type="hidden" id="start_lat" name="start_lat">
+                    <input type="hidden" id="start_lng" name="start_lng">
+                    
+                    <label for="end">End Location (optional, leave empty for loop):</label>
+                    <input type="text" id="end" name="end" placeholder="Enter address or leave empty for loop">
+                    <input type="hidden" id="end_lat" name="end_lat">
+                    <input type="hidden" id="end_lng" name="end_lng">
+                    
                     <label for="distance">Distance (km):</label>
-                    <input type="number" id="distance" name="distance" min="1" max="99" value="5">
-                    <button type="submit" class="cta-button route-btn">Generate Route</button>
+                    <input type="number" id="distance" name="distance" min="1" max="50" value="10" step="0.5" required>
+                    
+                    <label for="elevation_gain">Elevation Gain Target (m, optional):</label>
+                    <input type="number" id="elevation_gain" name="elevation_gain" min="0" max="2000" placeholder="e.g., 300" step="10">
+                    
+                    <label for="prefer">Route Preference:</label>
+                    <select id="prefer" name="prefer" required>
+                        <option value="green">Green Areas & Parks</option>
+                        <option value="trail">Trails & Dirt Paths</option>
+                        <option value="road">Roads & Pavement</option>
+                    </select>
+                    
+                    <button type="submit" class="cta-button route-btn" id="generateBtn">Generate Route</button>
                 </form>
-                <div id="route-result" class="route-result"></div>
+                <div id="route-result" style="margin-top: 1.5rem; padding: 1rem; background: rgba(234, 95, 148, 0.1); border-radius: 8px; display: none;">
+                    <h3 style="color: #ea5f94; margin-bottom: 0.5rem;">Route Generated!</h3>
+                    <p id="route-distance" style="color: #e6bfd6;"></p>
+                    <p id="route-elevation" style="color: #e6bfd6;"></p>
+                    <div id="map" style="width: 100%; height: 400px; margin-top: 1rem; border-radius: 8px;"></div>
+                </div>
+                <div id="error-message" style="margin-top: 1rem; padding: 1rem; background: rgba(255, 0, 0, 0.1); border-radius: 8px; color: #ff6b6b; display: none;"></div>
             </div>
         </div>
     </section>
     <footer style="margin-top:2.5rem;">
         <p>&copy; 2025 TrailForge. All rights reserved.</p>
     </footer>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="main.js"></script>
 </body>
 </html>
