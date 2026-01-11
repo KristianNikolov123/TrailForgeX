@@ -49,3 +49,5 @@ After updating your API key restrictions:
 3. Check the terminal - you should no longer see elevation API errors
 4. Elevation gain should show a non-zero value (if there's elevation change in your route)
 
+
+

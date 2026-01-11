@@ -370,6 +370,10 @@ if (genForm) {
                 if (!startLocation) {
                     throw new Error('Could not find start location');
                 }
+                // Show geocoded start display name
+                if (startLocation.display_name) {
+                    document.getElementById('start_geocoded_result').textContent = 'Found: ' + startLocation.display_name;
+                }
             }
             
             document.getElementById('start_lat').value = startLocation.lat;
@@ -389,12 +393,16 @@ if (genForm) {
                         display_name: `${endCoordMatch[1]}, ${endCoordMatch[2]}`
                     };
                 } else {
-                    endLocation = await geocodeAddress(endQuery);
+                endLocation = await geocodeAddress(endQuery);
+                // Show geocoded end display name
+                if (endLocation && endLocation.display_name) {
+                    document.getElementById('end_geocoded_result').textContent = 'Found: ' + endLocation.display_name;
                 }
-                if (endLocation) {
-                    document.getElementById('end_lat').value = endLocation.lat;
-                    document.getElementById('end_lng').value = endLocation.lng;
-                }
+            }
+            if (endLocation) {
+                document.getElementById('end_lat').value = endLocation.lat;
+                document.getElementById('end_lng').value = endLocation.lng;
+            }
             } else {
                 document.getElementById('end_lat').value = '';
                 document.getElementById('end_lng').value = '';

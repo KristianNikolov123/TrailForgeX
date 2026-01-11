@@ -130,3 +130,5 @@ Geocode an address to coordinates.
 - Route generation may take 10-30 seconds depending on area complexity
 - Make sure both servers (Python and PHP) are running simultaneously
 
+
+
