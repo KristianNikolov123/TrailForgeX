@@ -28,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ox.settings.use_cache = True
+ox.settings.use_cache = False
 ox.settings.log_console = False
 
 # ---------- INPUT MODEL ----------
