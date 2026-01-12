@@ -18,7 +18,7 @@
         <nav>
             <ul>
                 <li><a href="#">Home</a></li>
-                <li><a href="#">Trails</a></li>
+                <li><a href="trails.php">Trails</a></li>
                 <li><a href="generate.php" class="highlighted-nav">Generate Route</a></li>
                 <li><a href="#">Community</a></li>
                 <li><a href="#">About</a></li>
@@ -29,7 +29,7 @@
         <div class="hero-overlay"></div>
         <h1><span class="hero-icon">&#x1f3d4;&#xfe0f;</span> Discover &amp; Forge New Trails</h1>
         <p>Join TrailForgeX to explore, track, and share your trail adventures.</p>
-        <a href="#" class="cta-button">Get Started</a>
+        <a href="generate.php" class="cta-button">Get Started</a>
     </section>
     <section class="features parallax-features">
         <h2>Why TrailForge?</h2>

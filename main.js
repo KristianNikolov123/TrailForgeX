@@ -482,3 +482,62 @@ if (genForm) {
         }
     });
 }
+
+// --- Appended: UI JS for Trails/Favs/Share (for new features only) ---
+document.addEventListener('DOMContentLoaded', function() {
+    // Favourite Functionality
+    const favBtn = document.getElementById('favouriteRouteBtn');
+    const favIcon = document.getElementById('favouriteIcon');
+    let isFavourited = false; // This will be determined by backend/user state later
+    if (favBtn) {
+        favBtn.addEventListener('click', function() {
+            isFavourited = !isFavourited;
+            favIcon.textContent = isFavourited ? '★' : '☆';
+            favIcon.style.color = isFavourited ? '#ffc300' : '#ea5f94';
+            favBtn.classList.toggle('favourited', isFavourited);
+            // TODO: AJAX call to backend to actually favourite/unfavourite
+        });
+    }
+    // Share Functionality
+    const shareBtn = document.getElementById('shareRouteBtn');
+    const shareModal = document.getElementById('shareModal');
+    const closeShareModal = document.getElementById('closeShareModal');
+    const shareLink = document.getElementById('shareLink');
+    const copyShareLink = document.getElementById('copyShareLink');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', function() {
+            // For now, generate a dummy share link
+            shareLink.value = window.location.origin + '/trails.php?route_id=DEMO1234';
+            shareModal.style.display = 'flex';
+        });
+    }
+    if (closeShareModal) {
+        closeShareModal.addEventListener('click', function() {
+            shareModal.style.display = 'none';
+        });
+    }
+    if (copyShareLink) {
+        copyShareLink.addEventListener('click', function() {
+            shareLink.select();
+            document.execCommand('copy');
+            copyShareLink.textContent = 'Copied!';
+            setTimeout(() => {
+                copyShareLink.textContent = 'Copy';
+            }, 1100);
+        });
+    }
+    // Hide modal on outside click
+    if (shareModal) {
+        shareModal.addEventListener('click', function(e) {
+            if (e.target === shareModal) shareModal.style.display = 'none';
+        });
+    }
+    // Trails page: tab switching (if present)
+    document.querySelectorAll('.trails-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.trails-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            // Insert AJAX call or UI update for this tab if needed
+        });
+    });
+});

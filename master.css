@@ -426,3 +426,127 @@ footer {
 }
 
 /* Additional enhanced styles below the existing code */
+
+/* --- Appended: UI for Trails, Favourite, Share --- */
+.route-actions {
+    display: flex;
+    gap: 1em;
+    justify-content: flex-start;
+    align-items: center;
+    margin-top: 1.15em;
+}
+.btn-favourite, .btn-share {
+    padding: 0.6em 1.7em 0.6em 1em;
+    border: none;
+    background: #2e1226;
+    border-radius: 8px;
+    color: #ea5f94;
+    font-size: 1.11em;
+    font-weight: 700;
+    transition: background 0.18s, color 0.17s, box-shadow 0.16s;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.45em;
+    box-shadow: 0 2px 9px #ea5f9430;
+}
+.btn-favourite.favourited, .btn-favourite:active {
+    color: #ffc300;
+    background: #321926;
+    border: 1px solid #ffc30033;
+}
+.btn-favourite span {
+    font-size: 1.5em;
+    margin-right: 0.25em;
+}
+.btn-share:active {
+    background: #ea5f94;
+    color: #fff;
+}
+.modal {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    z-index: 999;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(27,14,22, 0.93);
+}
+.modal-content {
+    background: #2f1723;
+    border-radius: 15px;
+    padding: 2.2rem 2.6rem;
+    max-width: 96vw;
+    width: 350px;
+    box-shadow: 0 9px 60px #ea5f9445;
+    position: relative;
+    color: #e6bfd6;
+}
+.modal-content .close {
+    position: absolute;
+    top: 1rem; right: 1.6rem;
+    font-size: 2rem;
+    cursor: pointer;
+    color: #ea5f94;
+}
+.modal-content button.btn-copy {
+    background: #ea5f94;
+    color: #fff;
+    border: none;
+    padding: .45em 1.2em;
+    border-radius: 7px;
+    font-weight: 700;
+    cursor:pointer;
+    transition: background 0.16s;
+    margin-top: .9em;
+}
+.trails-main { max-width: 860px; margin: 0 auto; padding: 2em 1em; }
+.trails-tabs {
+    display: flex;
+    gap: 1.7em;
+    margin-bottom: 2em;
+}
+.trails-tab {
+    padding: 0.9em 2.3em;
+    border: none;
+    background: #25121e;
+    color: #ea5f94;
+    font-size: 1.18rem;
+    font-weight: 700;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    transition: background 0.17s, color 0.17s;
+    box-shadow: 0 1px 6px #ea5f9425;
+}
+.trails-tab.active {
+    background: #ea5f94;
+    color: #fff;
+}
+.trails-filters {
+    background: #2c1932;
+    color: #e6bfd6;
+    padding: 1.2em 1em;
+    border-radius: 0 0 14px 14px;
+    margin-bottom: 2em;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.7em;
+}
+.trails-list {
+    min-height: 120px;
+    width: 100%;
+}
+.no-routes {
+    color: #a58aa7;
+    font-size: 1.13rem;
+    padding: 2em 0;
+    text-align: center;
+}
+@media (max-width: 600px) {
+    .trails-tabs {flex-direction:column;gap:0.7em;}
+    .trails-filters {flex-direction:column;gap:0.7em;}
+    .trails-main {max-width:99vw;}
+}
+/* ...keep other site styles below... */
