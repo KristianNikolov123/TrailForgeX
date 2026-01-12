@@ -39,7 +39,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <nav>
             <ul>
                 <li><a href="index.php">Home</a></li>
-                <li><a href="#">Trails</a></li>
+                <li><a href="trails.php">Trails</a></li>
                 <li><a href="generate.php" class="highlighted-nav">Generate Route</a></li>
                 <li><a href="#">Community</a></li>
                 <li><a href="#">About</a></li>
@@ -98,6 +98,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <p id="route-distance" style="color:#e6bfd6;"></p>
                 <p id="route-elevation" style="color:#e6bfd6;"></p>
                 <div id="map" style="width: 100%; height: 340px; margin-top: 1rem; border-radius: 8px;"></div>
+                <div class="route-actions" style="margin-top:1rem; display:flex; gap:0.85rem;">
+                    <button class="btn-favourite" id="favouriteRouteBtn" type="button" title="Add to Favourites">
+                        <span id="favouriteIcon" style="font-size:1.5em;color:#ea5f94;">☆</span> Favourite
+                    </button>
+                    <button class="btn-share" id="shareRouteBtn" type="button" title="Share this Route">
+                        <span style="font-size:1.3em;">🔗</span> Share
+                    </button>
+                </div>
+                <div id="shareModal" class="modal" style="display:none;position: fixed;z-index:999;background:rgba(33,12,24,0.97);top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;">
+                  <div class="modal-content" style="background:#2f1723;padding:2.2rem 2.6rem;border-radius:20px;max-width:96vw;width:350px;box-shadow:0 9px 60px #ea5f9445;position:relative;">
+                    <span class="close" id="closeShareModal" style="position:absolute;top:1rem;right:1.6rem;font-size:2rem;cursor:pointer;color:#ea5f94">&times;</span>
+                    <p style="margin-bottom:.6rem;">Share this route:</p>
+                    <input type="text" id="shareLink" readonly style="padding:.5em 1em;width:90%;border-radius:6px;border:none;font-size:1.08em;background:#e6bfd6;color:#51263d;outline:none;">
+                    <button class="btn-copy" id="copyShareLink" style="margin-top:.9em;background:#ea5f94;color:#fff;border:none;padding:.45em 1.2em;border-radius:7px;font-weight:700;">Copy</button>
+                  </div>
+                </div>
             </div>
             <div id="error-message" style="margin-top:1rem; padding:1rem; background:rgba(255,0,0,0.11); border-radius:8px; color:#ff6b6b; width:100%;display:none;"></div>
         </div>
