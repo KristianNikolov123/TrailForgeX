@@ -549,4 +549,78 @@ footer {
     .trails-filters {flex-direction:column;gap:0.7em;}
     .trails-main {max-width:99vw;}
 }
+/* --- Login Modal & Form Styles --- */
+#loginModal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  align-items: center; justify-content: center;
+  background: rgba(20,10,25,0.92);
+  z-index: 1099;
+}
+#loginModal .login-modal-content {
+  background: #2f1723;
+  padding: 2rem 2.7rem;
+  border-radius: 15px;
+  max-width: 95vw;
+  width: 350px;
+  box-shadow: 0 7px 40px #ea5f9445;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+#loginModal h2 {
+  color: #fff;
+  margin: 0 0 1.3em 0;
+  text-align: center;
+}
+#loginModal form {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+#loginModal input[type="text"],
+#loginModal input[type="password"] {
+  background: #251a27;
+  color: #eee;
+  border: 1px solid #441126;
+  border-radius: 7px;
+  font-size: 1.07em;
+  padding: 8px 12px;
+  margin-bottom: 1em;
+}
+#loginModal input:focus {
+  outline: none;
+  border-color: #ea5f94;
+}
+#loginModal button[type="submit"] {
+  background: #ea5f94;
+  color: #fff;
+  border: none;
+  padding: .5em 1.3em;
+  border-radius: 7px;
+  font-weight: bold;
+  font-size: 1.06em;
+  cursor: pointer;
+  box-shadow: 0 2px 9px #ea5f9430;
+  transition: background 0.2s;
+}
+#loginModal button[type="submit"]:hover {
+  background: #e67e22;
+}
+#loginModal button[onclick] {
+  background: none;
+  color: #aaa;
+  border:none;
+  font-size: 1.45em;
+  cursor:pointer;
+  position:absolute;
+  top:1rem; right:1.3rem;
+}
+#loginError {
+  color: #ff6b6b;
+  text-align: center;
+  margin-top:0.8em;
+}
 /* ...keep other site styles below... */

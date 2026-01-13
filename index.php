@@ -22,6 +22,7 @@
                 <li><a href="generate.php" class="highlighted-nav">Generate Route</a></li>
                 <li><a href="#">Community</a></li>
                 <li><a href="#">About</a></li>
+                <li><a href="#" onclick="document.getElementById('loginModal').style.display='flex'">Log In</a></li>
             </ul>
         </nav>
     </header>
@@ -73,6 +74,27 @@
             <li class="news-item"><strong>Oct 5, 2025:</strong> Mobile app launch coming soon.</li>
         </ul>
     </section>
+    <div id="loginModal" style="display:none;">
+      <div class="login-modal-content">
+        <button onclick="document.getElementById('loginModal').style.display='none';" style="position:absolute;top:1rem;right:1.3rem;font-size:1.45em;background:none;color:#aaa;border:none;cursor:pointer;">&times;</button>
+        <h2>Log In</h2>
+        <form id="loginForm">
+          <input type="text" id="loginUsername" placeholder="Username" required>
+          <input type="password" id="loginPassword" placeholder="Password" required>
+          <button type="submit">Log In</button>
+        </form>
+        <div id="loginError"></div>
+        <hr style="margin:1.5em 0; opacity:0.4">
+        <h2 style="margin-bottom:.6em;">Sign Up</h2>
+        <form id="registerForm">
+          <input type="text" id="registerUsername" placeholder="Username" required>
+          <input type="email" id="registerEmail" placeholder="Email" required>
+          <input type="password" id="registerPassword" placeholder="Password" required>
+          <button type="submit">Sign Up</button>
+        </form>
+        <div id="registerError"></div>
+      </div>
+    </div>
     <footer>
         <p>&copy; 2025 TrailForgeX. All rights reserved.</p>
     </footer>
