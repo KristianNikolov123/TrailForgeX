@@ -1,28 +1,6 @@
 <?php
 $route = null;
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    // Geocoding will be handled by JavaScript, but we can keep PHP fallback
-    $payload = [
-        "start_lat" => floatval($_POST["start_lat"] ?? 42.6977),
-        "start_lng" => floatval($_POST["start_lng"] ?? 23.3219),
-        "end_lat"   => !empty($_POST["end_lat"]) ? floatval($_POST["end_lat"]) : null,
-        "end_lng"   => !empty($_POST["end_lng"]) ? floatval($_POST["end_lng"]) : null,
-        "distance_km" => floatval($_POST["distance"] ?? 5),
-        "elevation_gain_target" => !empty($_POST["elevation_gain"]) ? floatval($_POST["elevation_gain"]) : null,
-        "prefer" => $_POST["prefer"] ?? "green"
-    ];
-
-    $ch = curl_init("http://localhost:8000/generate");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    $route = json_decode($response, true);
-}
+$route_id = null;
 ?>
 
 <!DOCTYPE html>
@@ -34,6 +12,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <link rel="stylesheet" href="master.css">
 </head>
 <body>
+<script>
+(function() {
+  fetch('api/routes/check_auth.php').then(r => r.json()).then(jwt => {
+    if (!jwt || !jwt.logged_in) {
+      window.location.href = 'index.php';
+    }
+  });
+})();
+</script>
+
     <header>
         <div class="logo"><img src="TrailForgeX-logo.png" alt="TrailForgeX Logo" style="height:64px"></div>
         <nav>
@@ -79,7 +67,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <div id="end_geocoded_result" style="color:#e6bfd6;font-size:0.94em;margin:2px 0 8px 2px;"></div>
 
                 <label for="distance">Distance (km):</label>
-                <input type="number" id="distance" name="distance" min="1" max="50" value="10" step="0.5" required>
+                <input type="number" id="distance" name="distance" min="1" max="50" value="1" step="0.5" required>
 
                 <label for="elevation_gain">Elevation Gain Target (m, optional):</label>
                 <input type="number" id="elevation_gain" name="elevation_gain" min="0" max="2000" placeholder="e.g., 300" step="10">
@@ -98,6 +86,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <p id="route-distance" style="color:#e6bfd6;"></p>
                 <p id="route-elevation" style="color:#e6bfd6;"></p>
                 <div id="map" style="width: 100%; height: 340px; margin-top: 1rem; border-radius: 8px;"></div>
+                <?php if (isset($route_id) && $route_id): ?>
+                  <input type="hidden" id="currentRouteId" value="<?= htmlspecialchars($route_id) ?>">
+                  <script>window.currentRouteId = <?= (int)$route_id ?>;</script>
+                <?php endif; ?>
                 <div class="route-actions" style="margin-top:1rem; display:flex; gap:0.85rem;">
                     <button class="btn-favourite" id="favouriteRouteBtn" type="button" title="Add to Favourites">
                         <span id="favouriteIcon" style="font-size:1.5em;color:#ea5f94;">☆</span> Favourite

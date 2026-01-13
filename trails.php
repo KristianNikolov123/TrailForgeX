@@ -5,8 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trails | TrailForgeX</title>
     <link rel="stylesheet" href="master.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
 </head>
 <body>
+<script>
+(function() {
+  fetch('api/routes/check_auth.php').then(r => r.json()).then(jwt => {
+    if (!jwt || !jwt.logged_in) {
+      window.location.href = 'index.php';
+    }
+  });
+})();   
+</script>
+
     <header>
         <div class="logo"><img src="TrailForgeX-logo.png" alt="TrailForgeX Logo" style="height:64px"></div>
         <nav>
@@ -46,6 +58,7 @@
         <p>&copy; 2025 TrailForge. All rights reserved.</p>
     </footer>
     <script src="main.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
 
