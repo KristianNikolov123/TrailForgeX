@@ -20,13 +20,13 @@ if (!$username || !$email || !$password) {
     exit;
 }
 
-$mysqli = new mysqli('localhost', 'root', '', 'trailforgex');
+require_once '../../dbconn.php';
 if ($mysqli->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'DB connection failed']);
     exit;
 }
 // Check for duplicate username or email
-$stmt = $mysqli->prepare('SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1');
+$stmt = $connection->prepare('SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1');
 $stmt->bind_param('ss', $username, $email);
 $stmt->execute();
 $stmt->store_result();
@@ -35,13 +35,14 @@ if ($stmt->num_rows > 0) {
     exit;
 }
 // For demo: store password as plain text (INSECURE), use password_hash() in prod
-$stmt = $mysqli->prepare('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)');
+$stmt = $connection->prepare('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)');
 $stmt->bind_param('sss', $username, $email, $password);
 $stmt->execute();
 $user_id = $stmt->insert_id;
 $stmt->close();
-$mysqli->close();
+mysqli_close($connection);
 session_start();
 $_SESSION['user_id'] = $user_id;
 echo json_encode(['success' => true, 'user_id' => $user_id]);
+
 

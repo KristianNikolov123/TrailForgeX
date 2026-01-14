@@ -1,4 +1,5 @@
 <?php
+include "navbar.php";
 $route = null;
 $route_id = null;
 ?>
@@ -21,19 +22,6 @@ $route_id = null;
   });
 })();
 </script>
-
-    <header>
-        <div class="logo"><img src="TrailForgeX-logo.png" alt="TrailForgeX Logo" style="height:64px"></div>
-        <nav>
-            <ul>
-                <li><a href="index.php">Home</a></li>
-                <li><a href="trails.php">Trails</a></li>
-                <li><a href="generate.php" class="highlighted-nav">Generate Route</a></li>
-                <li><a href="#">Community</a></li>
-                <li><a href="#">About</a></li>
-            </ul>
-        </nav>
-    </header>
     <section class="generate-hero" style="background:
         linear-gradient(120deg, rgba(36,20,27,0.54) 55%, rgba(89,50,71,0.78) 100%),
         url('https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=1800&q=80') center center/cover no-repeat;

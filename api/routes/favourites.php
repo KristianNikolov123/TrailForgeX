@@ -29,3 +29,5 @@ $mysqli->close();
 echo json_encode(['success' => true, 'routes' => $favs]);
 
 
+
+
