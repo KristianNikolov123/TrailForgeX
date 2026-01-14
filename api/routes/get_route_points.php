@@ -22,3 +22,5 @@ while ($row = $res->fetch_assoc()) {
 $mysqli->close();
 echo json_encode(['success' => true, 'coordinates' => $points]);
 
+
+

@@ -1,3 +1,6 @@
+<?php
+include "navbar.php";
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,19 +21,6 @@
   });
 })();   
 </script>
-
-    <header>
-        <div class="logo"><img src="TrailForgeX-logo.png" alt="TrailForgeX Logo" style="height:64px"></div>
-        <nav>
-            <ul>
-                <li><a href="index.php">Home</a></li>
-                <li><a href="trails.php" class="highlighted-nav">Trails</a></li>
-                <li><a href="generate.php">Generate Route</a></li>
-                <li><a href="#">Community</a></li>
-                <li><a href="#">About</a></li>
-            </ul>
-        </nav>
-    </header>
     <main class="trails-main">
         <h1>Trails</h1>
         <div class="trails-tabs">

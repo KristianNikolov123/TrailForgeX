@@ -20,15 +20,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$route_id) {
     exit;
 }
 
-$mysqli = new mysqli('localhost', 'root', '', 'trailforgex');
+require_once '../../dbconn.php';
 if ($mysqli->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'Database connection failed.']);
     exit;
 }
 
-$mysqli->query("UPDATE routes SET is_public = 1 WHERE id = $route_id AND creator_id = $user_id");
+$connection->query("UPDATE routes SET is_public = 1 WHERE id = $route_id AND creator_id = $user_id");
 
-$check = $mysqli->prepare("SELECT 1 FROM route_shares WHERE user_id = ? AND route_id = ?");
+$check = $connection->prepare("SELECT 1 FROM route_shares WHERE user_id = ? AND route_id = ?");
 $check->bind_param('ii', $user_id, $route_id);
 $check->execute();
 $check->store_result();
@@ -36,10 +36,10 @@ $already_shared = $check->num_rows > 0;
 $check->close();
 
 if (!$already_shared) {
-    $ins = $mysqli->prepare("INSERT INTO route_shares (user_id, route_id) VALUES (?, ?)");
+    $ins = $connection->prepare("INSERT INTO route_shares (user_id, route_id) VALUES (?, ?)");
     $ins->bind_param('ii', $user_id, $route_id);
     $ins->execute();
     $ins->close();
 }
-$mysqli->close();
+mysqli_close($connection);
 echo json_encode(['success' => true, 'action' => 'shared']);

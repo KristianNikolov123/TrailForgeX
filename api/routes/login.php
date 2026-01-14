@@ -21,12 +21,12 @@ if (!$username || !$password) {
     exit;
 }
 
-$mysqli = new mysqli('localhost', 'root', '', 'trailforgex');
-if ($mysqli->connect_errno) {
+require_once __DIR__.'/../../dbconn.php';
+if ($connection->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'DB connection failed']);
     exit;
 }
-$stmt = $mysqli->prepare("SELECT id, password_hash FROM users WHERE username = ? LIMIT 1");
+$stmt = $connection->prepare("SELECT id, password_hash FROM users WHERE username = ? LIMIT 1");
 $stmt->bind_param('s', $username);
 $stmt->execute();
 $stmt->store_result();
@@ -44,5 +44,6 @@ if ($password === $password_hash) {
     echo json_encode(['success' => false, 'error' => 'Invalid username or password']);
 }
 $stmt->close();
-$mysqli->close();
+mysqli_close($connection);
+
 

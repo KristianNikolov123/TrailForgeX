@@ -1,5 +1,5 @@
 <?php
-// home.php
+include 'navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -10,22 +10,6 @@
     <link rel="stylesheet" href="master.css">
 </head>
 <body>
-    <header>
-        <div class="branding">
-            <img src="TrailForgeX-logo.png" alt="TrailForgeX Icon" class="branding-logo">
-            <img src="TrailForgeX-text.png" alt="TrailForgeX Text" class="branding-text">
-        </div>
-        <nav>
-            <ul>
-                <li><a href="#">Home</a></li>
-                <li><a href="trails.php">Trails</a></li>
-                <li><a href="generate.php" class="highlighted-nav">Generate Route</a></li>
-                <li><a href="#">Community</a></li>
-                <li><a href="#">About</a></li>
-                <li><a href="#" onclick="document.getElementById('loginModal').style.display='flex'">Log In</a></li>
-            </ul>
-        </nav>
-    </header>
     <section class="hero animated-bg">
         <div class="hero-overlay"></div>
         <h1><span class="hero-icon">&#x1f3d4;&#xfe0f;</span> Discover &amp; Forge New Trails</h1>

@@ -1,14 +1,12 @@
 // script.js
 
 // Example: smooth scroll for internal links
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+document.querySelectorAll('a[href^=\"#\"]:not([href=\"#\"])').forEach(anchor => {
     anchor.addEventListener('click', function(e){
         e.preventDefault();
         const target = document.querySelector(this.getAttribute('href'));
         if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth'
-            });
+            target.scrollIntoView({ behavior: 'smooth' });
         }
     });
 });
@@ -516,8 +514,67 @@ if (genForm) {
     });
 }
 
-// --- Appended: UI JS for Trails/Favs/Share (for new features only) ---
+// --- AJAX Login Handler (and Register Handler) ---
 document.addEventListener('DOMContentLoaded', function() {
+  // Debug for script load
+  console.log('main.js running!');
+
+  // --- LOGIN FORM HANDLER ---
+  const loginForm = document.getElementById('loginForm');
+  if (loginForm) {
+    loginForm.onsubmit = async function(e) {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      const res = await fetch('api/routes/login.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+      });
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        data = { success: false, error: 'Server error: invalid response' };
+      }
+      if (data.success) {
+        window.location.reload();
+      } else {
+        document.getElementById('loginError').innerText = data.error || 'Login failed.';
+      }
+    };
+  }
+
+  // --- REGISTER FORM HANDLER (if you want SPA-style registration too) ---
+  const registerForm = document.getElementById('registerForm');
+  if (registerForm) {
+    registerForm.onsubmit = async function(e) {
+      e.preventDefault();
+      const username = document.getElementById('registerUsername').value;
+      const email = document.getElementById('registerEmail').value;
+      const password = document.getElementById('registerPassword').value;
+      const res = await fetch('api/routes/register.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `username=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
+      });
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        data = { success: false, error: 'Server error: invalid response' };
+      }
+      if (data.success) {
+        window.location.reload();
+      } else {
+        document.getElementById('registerError').innerText = data.error || 'Registration failed.';
+      }
+    };
+  }
+
+// --- Appended: UI JS for Trails/Favs/Share (for new features only) ---
+
     // Favourite Functionality
     const favBtn = document.getElementById('favouriteRouteBtn');
     const favIcon = document.getElementById('favouriteIcon');
@@ -748,4 +805,8 @@ function showModalMap(containerId, coords) {
             pavement_type: pavement
         });
     });
+});
+document.getElementById('nav-login-btn')?.addEventListener('click', function(e){
+    e.preventDefault();
+    document.getElementById('loginModal').style.display = 'flex';
 });
