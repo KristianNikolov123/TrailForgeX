@@ -8,3 +8,4 @@ echo json_encode(['logged_in' => isset($_SESSION['user_id']) && !empty($_SESSION
 
 
 
+

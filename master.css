@@ -501,13 +501,23 @@ footer {
     transition: background 0.16s;
     margin-top: .9em;
 }
-.trails-main { max-width: 860px; margin: 0 auto; padding: 2em 1em; }
-.trails-tabs {
+/* =========================
+   GLOBAL / LAYOUT
+========================= */
+
+.trails-main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2em 1em;
+  }
+  
+  .trails-tabs {
     display: flex;
     gap: 1.7em;
     margin-bottom: 2em;
-}
-.trails-tab {
+  }
+  
+  .trails-tab {
     padding: 0.9em 2.3em;
     border: none;
     background: #25121e;
@@ -518,43 +528,288 @@ footer {
     cursor: pointer;
     transition: background 0.17s, color 0.17s;
     box-shadow: 0 1px 6px #ea5f9425;
-}
-.trails-tab.active {
+  }
+  
+  .trails-tab.active {
     background: #ea5f94;
     color: #fff;
-}
-.trails-filters {
-    background: #2c1932;
+  }
+  
+  /* =========================
+     FILTERS
+  ========================= */
+  
+  .trails-filters-card {
+    background: linear-gradient(90deg, #221021 95%, #e67e221a 100%);
     color: #e6bfd6;
-    padding: 1.2em 1em;
-    border-radius: 0 0 14px 14px;
-    margin-bottom: 2em;
+    padding: 1.1em;
+    border-radius: 12px;
+    margin-bottom: 1.7em;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 1.7em;
-}
-.trails-list {
-    min-height: 120px;
+    gap: 0.9em;
+    box-shadow: 0 5px 38px #ea5f9418;
+    border: 1.5px solid #321a2c;
+  }
+  
+  .trails-filters-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8em;
+  }
+  
+  .filter-field {
+    display: flex;
+    align-items: center;
+    background: #21131e;
+    border-radius: 8px;
+    padding: 0.3em 0.6em;
+    gap: 0.3em;
+  }
+  
+  .filter-icon {
+    opacity: 0.65;
+  }
+  
+  .filter-field input,
+  .filter-field select {
+    background: #1c1219;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 0.35em 0.8em;
+    font-size: 1em;
+    min-width: 65px;
+  }
+  
+  .filter-field input:focus,
+  .filter-field select:focus {
+    outline: 2px solid #ea5f94;
+    background: #2f1423;
+  }
+  
+  .filter-apply-btn {
+    padding: 0.65em 1.5em;
+    border-radius: 8px;
+    background: linear-gradient(90deg,#ea5f94 55%,#e67e22 100%);
+    color: #fff;
+    font-size: 1em;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 16px #ea5f9438;
+  }
+  
+  .filter-apply-btn:hover {
+    transform: scale(1.04);
+  }
+  
+  /* =========================
+     TRAILS GRID
+  ========================= */
+  
+  .trails-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2em;
+  }
+  
+  /* =========================
+     TRAILS ROUTE CARD (FINAL)
+  ========================= */
+  
+  .trails-route-card {
+    position: relative;
     width: 100%;
-}
-.no-routes {
+    max-width: 420px;
+    aspect-ratio: 1.5 / 1;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #232640;
+    box-shadow: 0 5px 42px #ea5f9435;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  
+  .trails-route-card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 16px 55px #ea5f9490;
+  }
+  
+  /* Leaflet map fills card */
+  .trails-route-map-mini,
+  .trails-route-map-mini-inner {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    overflow: hidden;
+    z-index: 1;
+  }
+  
+  /* =========================
+     CARD OVERLAYS
+  ========================= */
+  
+  .trails-route-names-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: .9em 1.2em .6em 1.2em;
+    background: linear-gradient(
+      180deg,
+      rgba(39,18,47,0.85) 85%,
+      rgba(25,13,25,0) 100%
+    );
+    color: #fff;
+    font-size: 1.12em;
+    font-weight: 600;
+    letter-spacing: .05em;
+    z-index: 3;
+    pointer-events: none;
+  }
+  
+  .trails-route-stats-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: .65em 1.2em .7em 1.2em;
+    background: linear-gradient(
+      0deg,
+      rgba(38,18,53,0.85) 80%,
+      rgba(33,12,33,0) 100%
+    );
+    display: flex;
+    gap: 1.5em;
+    align-items: center;
+    color: #ffdff7;
+    font-size: 1.05em;
+    font-weight: 700;
+    z-index: 3;
+    pointer-events: none;
+  }
+  
+  /* =========================
+     FAVOURITE STAR
+  ========================= */
+  
+  .trails-fav-star {
+    position: absolute;
+    top: 0.7em;
+    right: 1em;
+    font-size: 2em;
+    color: #ffc300;
+    background: rgba(44,19,33,.9);
+    border-radius: 50%;
+    padding: .1em .25em;
+    box-shadow: 0 4px 18px #ea5f9433;
+    z-index: 4;
+    opacity: 0;
+    transition: opacity .15s ease;
+    pointer-events: auto;
+  }
+  
+  .trails-route-card:hover .trails-fav-star {
+    opacity: 1;
+  }
+  
+  /* =========================
+     NO ROUTES
+  ========================= */
+  
+  .no-routes {
     color: #a58aa7;
     font-size: 1.13rem;
     padding: 2em 0;
     text-align: center;
-}
+  }
+  
+  /* =========================
+     MOBILE
+  ========================= */
+  
+  @media (max-width: 700px) {
+    .trails-route-card {
+      max-width: 100%;
+      aspect-ratio: 1.1 / 1;
+    }
+  
+    .trails-tabs {
+      flex-direction: column;
+    }
+  }
+
+  /* =========================
+   TRAILS GRID (responsive)
+   Put this near the end of master.css
+========================= */
+
+.trails-list {
+    display: grid;
+    gap: 1.2em;
+  
+    /* Auto-fit as many columns as will fit */
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  
+    /* Center the grid nicely on ultra-wide screens */
+    align-items: stretch;
+  }
+  
+  /* Make each card fill the grid cell */
+  .trails-route-card {
+    width: 100%;
+    max-width: none;           /* overrides your max-width: 420px */
+    aspect-ratio: 1.5 / 1;     /* keep your nice ratio */
+  }
+  
+  /* Make sure the mini-map always fills the card */
+  .trails-route-map-mini-inner {
+    width: 100%;
+    height: 100%;
+  }
+  
+  /* Optional: clamp columns on "normal" desktop so you get 2–3 on 1920px */
+  @media (min-width: 1400px) {
+    .trails-list {
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    }
+  }
+  
+  /* Optional: very large screens can pack more columns */
+  @media (min-width: 2600px) {
+    .trails-list {
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    }
+  }
+  
+  /* === MODAL LOGIN POPUP RESTORED === */
 @media (max-width: 600px) {
-    .trails-tabs {flex-direction:column;gap:0.7em;}
-    .trails-filters {flex-direction:column;gap:0.7em;}
-    .trails-main {max-width:99vw;}
+    .trails-tabs {
+        flex-direction:column;
+        gap:0.7em;
+    }
+    .trails-filters {
+        flex-direction:column;
+        gap:0.7em;
+    }
+    .trails-main {
+        max-width:99vw;
+    }
 }
 /* --- Login Modal & Form Styles --- */
 #loginModal {
   display: none;
   position: fixed;
-  top: 0; left: 0; width: 100vw; height: 100vh;
-  align-items: center; justify-content: center;
+  top: 0; 
+  left: 0; 
+  width: 100vw; 
+  height: 100vh;
+  align-items: center; 
+    justify-content: center;
   background: rgba(20,10,25,0.92);
   z-index: 1099;
 }
@@ -623,4 +878,34 @@ footer {
   text-align: center;
   margin-top:0.8em;
 }
-/* ...keep other site styles below... */
+
+.route-choices{
+    margin-top: 1rem;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  .route-card{
+    background:#2f1723;
+    border:1px solid #441126;
+    border-radius:14px;
+    padding:1rem 1.1rem;
+    box-shadow:0 6px 24px #00000033;
+    cursor:pointer;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .route-card:hover{ transform: translateY(-3px); box-shadow:0 10px 34px #ea5f9433; }
+  .route-card h3{ color:#ea5f94; margin-bottom:.4rem; }
+  .route-card .meta{ color:#e6bfd6; font-weight:700; display:flex; gap:1rem; flex-wrap:wrap; }
+  .route-card button{
+    margin-top:.8rem;
+    width:100%;
+    padding:.6rem 1rem;
+    border:none;
+    border-radius:10px;
+    background: linear-gradient(90deg,#ea5f94 55%,#e67e22 100%);
+    color:#fff;
+    font-weight:800;
+    cursor:pointer;
+  }
+  
