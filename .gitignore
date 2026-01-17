@@ -2,3 +2,6 @@
 /cache/
 *.json
 insert_debug.txt
+uploads/*
+!uploads/.gitkeep
+!uploads/profiles/.gitkeep

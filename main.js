@@ -93,8 +93,8 @@ function initMap(center = [42.6977, 23.3219]) {
         updateWhenZooming: false,
         updateWhenIdle: true,
         noWrap: false
-    });
-    
+});
+
     // Fallback: OpenStreetMap
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
@@ -326,198 +326,361 @@ function displayRoute(route) {
     }
 }
 
-// Generate Route form interaction
+// =============================================
+// Generate Route (TOP 3 options, start OR area)
+// =============================================
 const genForm = document.querySelector('.gen-form');
 if (genForm) {
-    genForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const generateBtn = document.getElementById('generateBtn');
-        const routeResult = document.getElementById('route-result');
-        const errorMessage = document.getElementById('error-message');
-        const routeDistance = document.getElementById('route-distance');
-        const routeElevation = document.getElementById('route-elevation');
-        
-        // Hide previous results
-        routeResult.style.display = 'none';
-        errorMessage.style.display = 'none';
-        
-        // Show loading state
-        generateBtn.disabled = true;
-        generateBtn.textContent = 'Generating...';
-        
-        try {
-            // Geocode start location
-            const startQuery = document.getElementById('start').value.trim();
-            if (!startQuery) {
-                throw new Error('Please enter a start location');
-            }
-            
-            // Check if user entered coordinates directly (e.g., "42.6977, 23.3219")
-            let startLocation = null;
-            const coordMatch = startQuery.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
-            if (coordMatch) {
-                startLocation = {
-                    lat: parseFloat(coordMatch[1]),
-                    lng: parseFloat(coordMatch[2]),
-                    display_name: `${coordMatch[1]}, ${coordMatch[2]}`
-                };
-                console.log('Using coordinates directly:', startLocation);
-            } else {
-                startLocation = await geocodeAddress(startQuery);
-                if (!startLocation) {
-                    throw new Error('Could not find start location');
-                }
-                // Show geocoded start display name
-                if (startLocation.display_name) {
-                    document.getElementById('start_geocoded_result').textContent = 'Found: ' + startLocation.display_name;
-                }
-            }
-            
-            document.getElementById('start_lat').value = startLocation.lat;
-            document.getElementById('start_lng').value = startLocation.lng;
-            
-            // Geocode end location if provided
-            const endQuery = document.getElementById('end').value.trim();
-            let endLocation = null;
-            
-            if (endQuery) {
-                // Check if user entered coordinates directly
-                const endCoordMatch = endQuery.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
-                if (endCoordMatch) {
-                    endLocation = {
-                        lat: parseFloat(endCoordMatch[1]),
-                        lng: parseFloat(endCoordMatch[2]),
-                        display_name: `${endCoordMatch[1]}, ${endCoordMatch[2]}`
-                    };
-                } else {
-                endLocation = await geocodeAddress(endQuery);
-                // Show geocoded end display name
-                if (endLocation && endLocation.display_name) {
-                    document.getElementById('end_geocoded_result').textContent = 'Found: ' + endLocation.display_name;
-                }
-            }
-            if (endLocation) {
-                document.getElementById('end_lat').value = endLocation.lat;
-                document.getElementById('end_lng').value = endLocation.lng;
-            }
-            } else {
-                document.getElementById('end_lat').value = '';
-                document.getElementById('end_lng').value = '';
-            }
-            
-            // Prepare payload
-            const payload = {
-                start_lat: startLocation.lat,
-                start_lng: startLocation.lng,
-                end_lat: endLocation ? endLocation.lat : null,
-                end_lng: endLocation ? endLocation.lng : null,
-                distance_km: parseFloat(document.getElementById('distance').value) || 10,
-                elevation_gain_target: document.getElementById('elevation_gain').value ? 
-                    parseFloat(document.getElementById('elevation_gain').value) : null,
-                prefer: document.getElementById('prefer').value || 'green'
-            };
-            
-            // Generate route
-            const response = await fetch('http://localhost:8000/generate', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            
-            const route = await response.json();
-            
-            if (route.error) {
-                throw new Error(route.error);
-            }
-            
-            // Check if route has coordinates
-            if (!route.coordinates || route.coordinates.length === 0) {
-                throw new Error('Route generated but no coordinates returned');
-            }
-            
-            console.log('Route received:', {
-                distance: route.distance_km,
-                elevation: route.elevation_gain_m,
-                coordCount: route.coordinates.length,
-                firstCoord: route.coordinates[0],
-                lastCoord: route.coordinates[route.coordinates.length - 1]
-            });
-            
-            // Display results
-            routeDistance.textContent = `Distance: ${route.distance_km} km`;
-            routeElevation.textContent = `Elevation Gain: ${route.elevation_gain_m} m`;
-            
-            // Make sure map container is visible and route result is shown
-            const mapDiv = document.getElementById('map');
-            if (mapDiv) {
-                mapDiv.style.display = 'block';
-                mapDiv.style.height = '400px';
-                mapDiv.style.width = '100%';
-            }
-            
-            // Show route result first
-            routeResult.style.display = 'block';
-            
-            // Display route on map - use setTimeout to ensure DOM is ready and map can initialize
-            setTimeout(() => {
-                console.log('Attempting to display route...');
-                displayRoute(route);
-            }, 300);
+  genForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
 
-            // --- Save generated route to DB via AJAX ---
-            try {
-                const saveData = {
-                    coordinates: route.coordinates,
-                    title: `Route from (${payload.start_lat}, ${payload.start_lng})`,
-                    activity_type: payload.prefer,
-                    description: route.description || '',
-                    start_lat: payload.start_lat,
-                    start_lng: payload.start_lng,
-                    distance_km: route.distance_km,
-                    elevation_gain_m: route.elevation_gain_m
-                };
-                const saveResp = await fetch('api/routes/save.php', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(saveData)
-                });
-                const saveResult = await saveResp.json();
-                if (saveResult.success && saveResult.route_id) {
-                    window.currentRouteId = saveResult.route_id;
-                    let idHidden = document.getElementById('currentRouteId');
-                    if (!idHidden) {
-                        idHidden = document.createElement('input');
-                        idHidden.type = 'hidden';
-                        idHidden.id = 'currentRouteId';
-                        document.body.appendChild(idHidden);
-                    }
-                    idHidden.value = saveResult.route_id;
-                } else {
-                    console.warn('Route save failed:', saveResult.error);
-                }
-            } catch(err) {
-                console.warn('Route save/DB error:', err);
-            }
-            routeResult.style.display = 'block';
-            // Scroll to results
-            routeResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            
-        } catch (error) {
-            errorMessage.textContent = `Error: ${error.message}`;
-            errorMessage.style.display = 'block';
-            console.error('Route generation error:', error);
-        } finally {
-            generateBtn.disabled = false;
-            generateBtn.textContent = 'Generate Route';
+    const generateBtn   = document.getElementById('generateBtn');
+    const routeResult   = document.getElementById('route-result');
+    const errorMessage  = document.getElementById('error-message');
+    const routeDistance = document.getElementById('route-distance');
+    const routeElevation= document.getElementById('route-elevation');
+
+    const choicesWrap   = document.getElementById('routeChoices'); // from your updated generate.php
+    if (choicesWrap) choicesWrap.style.display = 'none';
+    if (choicesWrap) choicesWrap.innerHTML = '';
+
+    // Hide previous results
+    if (routeResult) routeResult.style.display = 'none';
+    if (errorMessage) errorMessage.style.display = 'none';
+
+    generateBtn.disabled = true;
+    generateBtn.textContent = 'Generating 3 routes...';
+
+    try {
+      const prefer = document.getElementById('prefer')?.value || 'green';
+      const distanceKm = parseFloat(document.getElementById('distance')?.value) || 10;
+      const elevTarget = document.getElementById('elevation_gain')?.value
+        ? parseFloat(document.getElementById('elevation_gain')?.value)
+        : null;
+
+      // detect mode (start vs area)
+      const isAreaMode = document.getElementById('mode_area')?.checked === true;
+
+      let payload = {
+        distance_km: distanceKm,
+        elevation_gain_target: elevTarget,   // backend should enforce +-5%
+        prefer: prefer,
+        n_routes: 3                          // backend generates exactly 3
+      };
+
+      if (!isAreaMode) {
+        // ---------- START MODE ----------
+        const startQuery = document.getElementById('start')?.value.trim() || '';
+        if (!startQuery) throw new Error('Please enter a start location');
+
+        // Geocode start
+        let startLocation = null;
+        const coordMatch = startQuery.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+        if (coordMatch) {
+          startLocation = { lat: parseFloat(coordMatch[1]), lng: parseFloat(coordMatch[2]), display_name: startQuery };
+        } else {
+          startLocation = await geocodeAddress(startQuery);
+          if (startLocation?.display_name) {
+            const el = document.getElementById('start_geocoded_result');
+            if (el) el.textContent = 'Found: ' + startLocation.display_name;
+          }
         }
-    });
+        if (!startLocation) throw new Error('Could not find start location');
+
+        document.getElementById('start_lat').value = startLocation.lat;
+        document.getElementById('start_lng').value = startLocation.lng;
+
+        // Optional end
+        const endQuery = document.getElementById('end')?.value.trim() || '';
+        let endLocation = null;
+
+        if (endQuery) {
+          const endCoordMatch = endQuery.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+          if (endCoordMatch) {
+            endLocation = { lat: parseFloat(endCoordMatch[1]), lng: parseFloat(endCoordMatch[2]), display_name: endQuery };
+          } else {
+            endLocation = await geocodeAddress(endQuery);
+            if (endLocation?.display_name) {
+              const el = document.getElementById('end_geocoded_result');
+              if (el) el.textContent = 'Found: ' + endLocation.display_name;
+            }
+          }
+
+          if (endLocation) {
+            document.getElementById('end_lat').value = endLocation.lat;
+            document.getElementById('end_lng').value = endLocation.lng;
+          }
+        } else {
+          document.getElementById('end_lat').value = '';
+          document.getElementById('end_lng').value = '';
+        }
+
+        payload.start_lat = startLocation.lat;
+        payload.start_lng = startLocation.lng;
+        payload.end_lat   = endLocation ? endLocation.lat : null; // null => loop
+        payload.end_lng   = endLocation ? endLocation.lng : null;
+        payload.mode = endLocation ? 'point_to_point' : 'loop_from_start';
+
+      } else {
+        // ---------- AREA MODE (no start/end) ----------
+        const areaQuery = document.getElementById('area')?.value.trim() || '';
+        if (!areaQuery) throw new Error('Please enter an area/city/landmark');
+
+        let center = null;
+        const coordMatch = areaQuery.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+        if (coordMatch) {
+          center = { lat: parseFloat(coordMatch[1]), lng: parseFloat(coordMatch[2]), display_name: areaQuery };
+        } else {
+          center = await geocodeAddress(areaQuery);
+          if (center?.display_name) {
+            const el = document.getElementById('area_geocoded_result');
+            if (el) el.textContent = 'Found: ' + center.display_name;
+          }
+        }
+        if (!center) throw new Error('Could not find that area');
+
+        document.getElementById('center_lat').value = center.lat;
+        document.getElementById('center_lng').value = center.lng;
+
+        payload.center_lat = center.lat;
+        payload.center_lng = center.lng;
+        payload.mode = 'loop_in_area';
+      }
+
+      // ✅ ONE call that returns 3 routes
+      // Your backend endpoint should be /generate3 (FastAPI) or whatever you choose.
+      // Change URL here if needed.
+      const resp = await fetch('http://localhost:8000/generate3', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok) {
+        // FastAPI 422 returns { detail: [...] }
+        const detail = data?.detail ? JSON.stringify(data.detail) : '';
+        const msg = data?.error || detail || resp.statusText || 'Request failed';
+        throw new Error(`API error (${resp.status}): ${msg}`);
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to generate routes.');
+      }
+
+      
+      if (!Array.isArray(data.routes) || data.routes.length === 0) {
+        throw new Error('No routes returned.');
+      }
+      
+      // show best one immediately:
+      const bestRoute = data.routes[data.best_index ?? 0];
+
+      if (routeDistance) routeDistance.textContent = `Distance: ${Number(bestRoute.distance_km).toFixed(2)} km`;
+      if (routeElevation) routeElevation.textContent = `Elevation Gain: ${Number(bestRoute.elevation_gain_m).toFixed(0)} m`;
+      if (routeResult) routeResult.style.display = 'block';
+
+
+      displayRoute(bestRoute);
+      
+      // store for later
+      window.lastGeneratedRoutes = data.routes;
+      window.bestGeneratedIndex = data.best_index ?? 0;
+      
+      // Render the 3 cards
+      renderRouteChoices(data.routes);
+      
+
+    } catch (error) {
+      if (errorMessage) {
+        errorMessage.textContent = `Error: ${error.message}`;
+        errorMessage.style.display = 'block';
+      }
+      console.error('Route generation error:', error);
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generate (3 Options)';
+    }
+  });
 }
+
+// =============================================
+// UI: render 3 route cards + let user pick one
+// =============================================
+function renderRouteChoices(routes) {
+  const choicesWrap = document.getElementById('routeChoices');
+  const routeResult = document.getElementById('route-result');
+  const routeDistance = document.getElementById('route-distance');
+  const routeElevation = document.getElementById('route-elevation');
+
+  if (!choicesWrap) return;
+
+  choicesWrap.style.display = 'block';
+  choicesWrap.innerHTML = '';
+
+  routes.slice(0, 3).forEach((r, idx) => {
+    const dist = (r.distance_km != null) ? Number(r.distance_km).toFixed(2) : '—';
+    const elev = (r.elevation_gain_m != null) ? Number(r.elevation_gain_m).toFixed(0) : '—';
+    const title = r.title || `Option ${idx + 1}`;
+
+    const card = document.createElement('div');
+    card.style = `
+      background:rgba(234,95,148,0.08);
+      border:1px solid rgba(234,95,148,0.25);
+      border-radius:14px;
+      padding:1rem;
+      margin-top:.8rem;
+      box-shadow:0 10px 35px rgba(234,95,148,0.15);
+      cursor:pointer;
+    `;
+
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+        <div style="font-weight:800;color:#fff;font-size:1.1rem;">${title}</div>
+        <div style="color:#e6bfd6;font-weight:800;">${dist} km · ⬆ ${elev} m</div>
+      </div>
+      <div style="color:#d9a7c8;margin-top:.35rem;line-height:1.35;">
+        ${r.summary || 'Click to select and preview on the map.'}
+      </div>
+      <div style="margin-top:.7rem;">
+        <button type="button" style="background:#ea5f94;color:#fff;border:none;padding:.55em 1.1em;border-radius:10px;font-weight:800;cursor:pointer;">
+          Select this route
+        </button>
+      </div>
+    `;
+
+    card.addEventListener('click', async () => {
+      // Show chosen route on map
+      if (routeDistance) routeDistance.textContent = `Distance: ${Number(r.distance_km).toFixed(2)} km`;
+      if (routeElevation) routeElevation.textContent = `Elevation Gain: ${Number(r.elevation_gain_m).toFixed(0)} m`;
+
+      if (routeResult) routeResult.style.display = 'block';
+
+      const mapDiv = document.getElementById('map');
+      if (mapDiv) {
+        mapDiv.style.display = 'block';
+        mapDiv.style.height = '400px';
+        mapDiv.style.width = '100%';
+      }
+
+      setTimeout(() => displayRoute(r), 250);
+
+      // Save ONLY the selected route (so DB doesn't get 3 per request)
+      try {
+        const saveData = {
+          coordinates: r.coordinates,
+          title: r.title || 'Generated Route',
+          activity_type: document.getElementById('prefer')?.value || 'green',
+          description: r.description || '',
+          start_lat: (r.start_lat != null ? r.start_lat : null),
+          start_lng: (r.start_lng != null ? r.start_lng : null),
+          distance_km: r.distance_km,
+          elevation_gain_m: r.elevation_gain_m
+        };
+
+        const saveResp = await fetch('api/routes/save.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(saveData)
+        });
+
+        const saveResult = await saveResp.json();
+        if (saveResult.success && saveResult.route_id) {
+          window.currentRouteId = saveResult.route_id;
+
+          let idHidden = document.getElementById('currentRouteId');
+          if (!idHidden) {
+            idHidden = document.createElement('input');
+            idHidden.type = 'hidden';
+            idHidden.id = 'currentRouteId';
+            document.body.appendChild(idHidden);
+          }
+          idHidden.value = saveResult.route_id;
+        } else {
+          console.warn('Route save failed:', saveResult.error);
+        }
+      } catch (err) {
+        console.warn('Save error:', err);
+      }
+
+      // Scroll to map
+      routeResult?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    choicesWrap.appendChild(card);
+  });
+}
+
 
 // --- AJAX Login Handler (and Register Handler) ---
 document.addEventListener('DOMContentLoaded', function() {
-  // Debug for script load
-  console.log('main.js running!');
+    // Debug for script load
+    console.log('main.js running!');
+
+    // --- Auth guard (redirect if not logged in) ---
+    (function checkAuthGuard() {
+        // Only run on pages that require auth (e.g. trails.php, generate.php)
+        // We detect them by presence of a known element or body class
+        const requiresAuth =
+        document.body.classList.contains('requires-auth') ||
+        document.getElementById('trailsList') ||
+        document.querySelector('.gen-form');
+    
+        if (!requiresAuth) return;
+    
+        fetch('api/routes/check_auth.php', { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(jwt => {
+            if (!jwt || !jwt.logged_in) {
+            window.location.href = 'index.php';
+            }
+        })
+        .catch(() => {
+            // If auth check fails, fail closed
+            window.location.href = 'index.php';
+        });
+    })();
+
+    // --- Toggle Area Mode fields (Generate in area) ---
+    const modeStart  = document.getElementById('mode_start');
+    const modeArea   = document.getElementById('mode_area');
+    const startBlock = document.getElementById('startBlock');
+    const areaBlock  = document.getElementById('areaBlock');
+
+    function syncGenerateMode() {
+        if (!modeStart || !modeArea) return;
+
+        const isArea = modeArea.checked;
+
+        if (startBlock) startBlock.style.display = isArea ? 'none' : 'block';
+        if (areaBlock)  areaBlock.style.display  = isArea ? 'block' : 'none';
+
+        // Start required only in start mode
+        const startInput = document.getElementById('start');
+        if (startInput) startInput.required = !isArea;
+
+        const clearValue = (id) => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+          };
+        if (isArea) {
+            clearValue('start_lat');
+            clearValue('start_lng');
+            clearValue('end_lat');
+            clearValue('end_lng');
+        } else {
+            clearValue('center_lat');
+            clearValue('center_lng');
+        }
+
+    }
+
+    // Attach listeners
+    if (modeStart) modeStart.addEventListener('change', syncGenerateMode);
+    if (modeArea)  modeArea.addEventListener('change', syncGenerateMode);
+
+    // Run once on load
+    syncGenerateMode();
 
   // --- LOGIN FORM HANDLER ---
   const loginForm = document.getElementById('loginForm');
@@ -650,93 +813,216 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Trails page: tab switching (if present)
     function renderRoutes(list, routes) {
-    list.innerHTML = '';
-    if (!routes.length) {
-        list.innerHTML = '<div class="no-routes">No routes to show. Generate or start favouriting routes!</div>';
-        return;
-    }
-    for (const route of routes) {
-        const div = document.createElement('div');
-        div.className = 'trails-route-card';
-        div.tabIndex = 0;
-        div.style.cursor = 'pointer';
-        div.innerHTML =
-            `<div><b>${route.title}</b> (${route.distance_km} km, ${route.elevation_gain_m} m, ${route.activity_type})<br>
-                <span style='font-size:.96em; color:#cebad0;'>${route.description||''}</span>
+        list.innerHTML = '';
+      
+        if (!routes.length) {
+          list.innerHTML = '<div class="no-routes">No routes to show.</div>';
+          return;
+        }
+      
+        for (const route of routes) {
+          const div = document.createElement('div');
+          div.className = 'trails-route-card';
+          div.tabIndex = 0;
+      
+          const startName = route.start_name || "(missing name)";
+          const endName = route.end_name || "(missing name)";
+          const routeLabel = `${startName} → ${endName}`;
+          const minimapId = `minimap_${route.id}`;
+      
+          div.innerHTML = `
+            <div class="trails-route-map-mini">
+              <div id="${minimapId}" class="trails-route-map-mini-inner"></div>
             </div>
-            <div style='font-size:.93em; color:#ae89c9;'>Created: ${route.created_at.split(' ')[0]}</div>`;
-        div.onclick = function() {
-            openRouteMapModal(route.id, route.title, route);
-        };
-        list.appendChild(div);
-    }
-}
+      
+            <div class="trails-route-names-overlay">
+              🌄 ${routeLabel}
+            </div>
+      
+            <div class="trails-route-stats-overlay">
+              <span>${Number(route.distance_km).toFixed(2)} km</span>
+              <span>⬆ ${route.elevation_gain_m} m</span>
+            </div>
+      
+            <span class="trails-fav-star"
+              onclick="event.stopPropagation();toggleFavourite(${route.id}, this)">
+              ★
+            </span>
+          `;
+      
+          div.onclick = () => openRouteMapModal(route.id, routeLabel, route);
+      
+          list.appendChild(div);
+      
+          setTimeout(() => initMiniRouteMap(minimapId, route.id), 50);
+        }
+      }
+      
 
+      function initMiniRouteMap(minimapId, routeId) {
+        fetch('api/routes/get_route_points.php?route_id=' + routeId)
+          .then(res => res.json())
+          .then(data => {
+            if (!data.success || !data.coordinates.length) return;
+      
+            const container = document.getElementById(minimapId);
+            if (!container) return;
+      
+            const map = L.map(minimapId, {
+              zoomControl: false,
+              attributionControl: false,
+              dragging: false,
+              scrollWheelZoom: false,
+              doubleClickZoom: false,
+              boxZoom: false,
+              keyboard: false,
+              tap: false,
+              touchZoom: false
+            });
+      
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom: 17
+            }).addTo(map);
+      
+            const latlngs = data.coordinates.map(p => [p[0], p[1]]);
+      
+            const line = L.polyline(latlngs, {
+              color: '#ea5f94',
+              weight: 5,
+              opacity: 0.95
+            }).addTo(map);
+      
+            map.fitBounds(line.getBounds(), {
+              padding: [20, 20],
+              maxZoom: 16
+            });
+      
+            // 🔑 Critical
+            setTimeout(() => map.invalidateSize(true), 100);
+          });
+      }
+      
 // --- Map Modal for Viewing Public/Favourite Route ---
 function openRouteMapModal(route_id, routeTitle, routeMeta) {
     let modal = document.getElementById('routeMapModal');
+  
+    // Helper: close modal + cleanup esc listener
+    const closeModal = () => {
+      if (!modal) return;
+      modal.style.display = 'none';
+      if (modal._escHandler) {
+        document.removeEventListener('keydown', modal._escHandler);
+        modal._escHandler = null;
+      }
+    };
+  
     if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'routeMapModal';
-        modal.style = 'position:fixed; top:0; left:0; width:100vw;height:100vh;background:rgba(24,13,39,0.98); z-index:2050; display:flex; align-items:center;justify-content:center;';
-        modal.innerHTML = `<div style="background:#2f1723;color:#f8eef7;min-width:300px;width:95vw; max-width:510px; min-height:350px;border-radius:18px;box-shadow:0 12px 56px #ea5f9470;position:relative;padding:2rem 2.25rem;display:flex;flex-direction:column;gap:1.1em;align-items:center;">
-            <button id="closeRouteMapModal" style="position:absolute; top:0.65em; right:1.1em; border:none; background:none;color:#ea5f94;font-size:2em;cursor:pointer;">&times;</button>
-            <div style="font-size:1.33em;font-weight:bold;margin-bottom:.4em;">${routeTitle || 'Route Map'}</div>
-            <div id="modalMapMeta"></div>
-            <div id="routeMapContainer" style="width:100%;min-width:270px; height:320px; background:#242; border-radius:9px; box-shadow:0 2px 19px #ea5f9412;"></div>
-        </div>`;
-        document.body.appendChild(modal);
+      modal = document.createElement('div');
+      modal.id = 'routeMapModal';
+      modal.style = 'position:fixed; top:0; left:0; width:100vw;height:100vh;background:rgba(24,13,39,0.98); z-index:2050; display:flex; align-items:center;justify-content:center;';
+  
+      modal.innerHTML = `
+        <div id="routeMapModalCard"
+             style="background:#2f1723;color:#f8eef7;min-width:300px;width:95vw; max-width:510px; min-height:350px;border-radius:18px;box-shadow:0 12px 56px #ea5f9470;position:relative;padding:2rem 2.25rem;display:flex;flex-direction:column;gap:1.1em;align-items:center;">
+          <button id="closeRouteMapModal"
+                  aria-label="Close"
+                  style="position:absolute; top:0.65em; right:1.1em; border:none; background:none;color:#ea5f94;font-size:2em;cursor:pointer;">&times;</button>
+          <div style="font-size:1.33em;font-weight:bold;margin-bottom:.4em;">${routeTitle || 'Route Map'}</div>
+          <div id="modalMapMeta"></div>
+          <div id="routeMapContainer"
+               style="width:100%;min-width:270px; height:320px; background:#242; border-radius:9px; box-shadow:0 2px 19px #ea5f9412;"></div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+  
+      // ✅ Close when clicking outside the card (overlay click)
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+      });
+  
+      // ✅ Close button
+      modal.querySelector('#closeRouteMapModal').addEventListener('click', closeModal);
     } else {
-        modal.style.display = 'flex';
+      modal.style.display = 'flex';
+      // Update title each time (since innerHTML isn't rebuilt)
+      const card = modal.querySelector('#routeMapModalCard');
+      if (card) {
+        const titleDiv = card.querySelector('div');
+        if (titleDiv) titleDiv.textContent = routeTitle || 'Route Map';
+      }
     }
-    document.getElementById('closeRouteMapModal').onclick = function(){ modal.style.display='none'; };
+  
     // Render metadata if available
-    document.getElementById('modalMapMeta').innerHTML = routeMeta ? `<span style='color:#ddc2e0;'>Created: ${routeMeta.created_at && routeMeta.created_at.split(' ')[0]}</span><br><span style='color:#bbdaae;'>${routeMeta.description||''}</span>` : '';
+    document.getElementById('modalMapMeta').innerHTML = routeMeta
+      ? `<span style='color:#ddc2e0;'>Created: ${routeMeta.created_at && routeMeta.created_at.split(' ')[0]}</span><br><span style='color:#bbdaae;'>${routeMeta.description || ''}</span>`
+      : '';
+  
+    // ✅ Close on ESC
+    modal._escHandler = (ev) => {
+      if (ev.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', modal._escHandler);
+  
     // Fetch and show the map
     fetch('api/routes/get_route_points.php?route_id=' + route_id)
-        .then(res=>res.json())
-        .then(data => {
-            if (!data.success || !data.coordinates.length) {
-                document.getElementById('routeMapContainer').innerHTML = '<div style="color:#eb9aac;padding:2em;text-align:center;">No points found for this route.</div>';
-                return;
-            }
-            setTimeout(() => showModalMap('routeMapContainer', data.coordinates), 120);
-        });
-}
-
-function showModalMap(containerId, coords) {
-    // Fully remove any old map container and add a new, unique one each time.
-    let parent = document.getElementById(containerId)?.parentNode;
-    if (!parent) return;
-    let mapId = "modalMap_" + Math.floor(Math.random() * 1e8);
-    parent.innerHTML = `<div id="${mapId}" style="background:#222246;min-width:280px;width:100%;height:320px;border-radius:9px;box-shadow:0 2px 19px #ea5f9412;"></div>`;
-    setTimeout(() => {
-        const modalMap = L.map(mapId, {zoomControl:true});
-        setTimeout(() => { modalMap.invalidateSize(); }, 120);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors', maxZoom: 19
-        }).addTo(modalMap);
-        const latlngs = coords.map(x => [x[0], x[1]]);
-        if (latlngs.length >= 2) {
-            L.polyline(latlngs, {color:'#ea5f94',weight:7,opacity:1.0}).addTo(modalMap);
-            L.marker(latlngs[0], {icon: L.icon({
-                iconUrl:'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
-                shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41], shadowSize:[41,41]
-            })}).addTo(modalMap).bindPopup('Start');
-            let end = latlngs[latlngs.length-1];
-            L.marker(end, {icon: L.icon({
-                iconUrl:'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41], shadowSize:[41,41]
-            })}).addTo(modalMap).bindPopup('End');
-            modalMap.fitBounds(L.latLngBounds(latlngs), {padding:[40,40], maxZoom:17});
-        } else if (latlngs.length === 1) {
-            modalMap.setView(latlngs[0], 15);
-            L.marker(latlngs[0]).addTo(modalMap).bindPopup('Point');
-        } else {
-            document.getElementById(mapId).innerHTML = '<div style="color:#eb9aac;padding:2em;text-align:center;">No points found for this route.</div>';
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success || !data.coordinates.length) {
+          document.getElementById('routeMapContainer').innerHTML =
+            '<div style="color:#eb9aac;padding:2em;text-align:center;">No points found for this route.</div>';
+          return;
         }
-    }, 120);
-}
+        setTimeout(() => showModalMap('routeMapContainer', data.coordinates), 120);
+      });
+  }
+  
+
+  function showModalMap(containerId, coords) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+  
+    // Create an inner div ONLY inside the container
+    const mapId = "modalMap_" + Math.floor(Math.random() * 1e8);
+    container.innerHTML = `<div id="${mapId}" style="background:#222246;width:100%;height:320px;border-radius:9px;box-shadow:0 2px 19px #ea5f9412;"></div>`;
+  
+    setTimeout(() => {
+      const modalMap = L.map(mapId, { zoomControl: true });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(modalMap);
+  
+      const latlngs = coords.map(x => [x[0], x[1]]);
+  
+      if (latlngs.length >= 2) {
+        const line = L.polyline(latlngs, { color: '#ea5f94', weight: 7, opacity: 1.0 }).addTo(modalMap);
+  
+        L.marker(latlngs[0], { icon: L.icon({
+          iconUrl:'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+          shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+          iconSize:[25,41], iconAnchor:[12,41], shadowSize:[41,41]
+        })}).addTo(modalMap).bindPopup('Start');
+  
+        L.marker(latlngs[latlngs.length - 1], { icon: L.icon({
+          iconUrl:'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+          shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+          iconSize:[25,41], iconAnchor:[12,41], shadowSize:[41,41]
+        })}).addTo(modalMap).bindPopup('End');
+  
+        modalMap.fitBounds(line.getBounds(), { padding: [40, 40], maxZoom: 17 });
+      } else if (latlngs.length === 1) {
+        modalMap.setView(latlngs[0], 15);
+        L.marker(latlngs[0]).addTo(modalMap).bindPopup('Point');
+      } else {
+        document.getElementById(mapId).innerHTML =
+          '<div style="color:#eb9aac;padding:2em;text-align:center;">No points found for this route.</div>';
+      }
+  
+      // 🔑 Fix grey/blank tiles in modals
+      setTimeout(() => modalMap.invalidateSize(true), 150);
+    }, 100);
+  }
+  
 
 
     
@@ -750,7 +1036,15 @@ function showModalMap(containerId, coords) {
         }
         if (search.length) url += '?' + search.join('&');
         const resp = await fetch(url);
-        const data = await resp.json();
+        const raw = await resp.text();
+
+        let data;
+        try {
+        data = JSON.parse(raw);
+        } catch (e) {
+        console.error("public.php returned non-JSON:", raw);
+        throw new Error("public.php did not return JSON (check console for raw response).");
+        }
         const list = document.getElementById('trailsList');
         if (!data.success || !data.routes) {
             list.innerHTML = '<div class="no-routes">Failed to load public routes.</div>';
@@ -760,17 +1054,38 @@ function showModalMap(containerId, coords) {
     }
 
     // Favourites (already loaded elsewhere if needed)
-    async function loadFavourites() {
-        const resp = await fetch('api/routes/favourites.php');
-        const data = await resp.json();
+    async function loadFavourites(filters = {}) {
+        let url = 'api/routes/favourites.php';
+        const search = [];
+      
+        for (const key in filters) {
+          const v = filters[key];
+          if (v !== undefined && v !== null && String(v).trim() !== '') {
+            search.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
+          }
+        }
+        if (search.length) url += '?' + search.join('&');
+      
+        const resp = await fetch(url);
+        const raw = await resp.text();
+
+        let data;
+        try {
+        data = JSON.parse(raw);
+        } catch (e) {
+        console.error("favourites.php returned non-JSON:", raw);
+        throw new Error("favourites.php did not return JSON (check console for raw response).");
+        }
+
         const list = document.getElementById('trailsList');
+      
         if (!data.success || !data.routes) {
-            list.innerHTML = '<div class="no-routes">Failed to load favourites.</div>';
-            return;
+          list.innerHTML = '<div class="no-routes">Failed to load favourites.</div>';
+          return;
         }
         renderRoutes(list, data.routes);
-    }
-
+      }
+      
     // Tab switching logic
     document.querySelectorAll('.trails-tab').forEach(tab => {
         tab.addEventListener('click', function() {
@@ -797,14 +1112,83 @@ function showModalMap(containerId, coords) {
         const minElevation = document.getElementById('minElevation').value;
         const maxElevation = document.getElementById('maxElevation').value;
         const pavement = document.getElementById('pavementType').value;
-        loadPublicRoutes({
-            distance_min: minDistance,
-            distance_max: maxDistance,
-            elev_min: minElevation,
-            elev_max: maxElevation,
-            pavement_type: pavement
+      
+        const filters = {
+          distance_min: minDistance,
+          distance_max: maxDistance,
+          elev_min: minElevation,
+          elev_max: maxElevation,
+          pavement_type: pavement
+        };
+      
+        const activeTab = document.querySelector('.trails-tab.active')?.getAttribute('data-tab');
+      
+        if (activeTab === 'public') {
+          loadPublicRoutes(filters);
+        } else {
+          loadFavourites(filters);  // ✅ filter favourites too
+        }
+      });
+
+        // ===============================
+        // Auto-refresh when filters cleared
+        // ===============================
+
+        let filtersDebounceTimer = null;
+
+        function getFilters() {
+        return {
+            distance_min: document.getElementById('minDistance')?.value ?? '',
+            distance_max: document.getElementById('maxDistance')?.value ?? '',
+            elev_min: document.getElementById('minElevation')?.value ?? '',
+            elev_max: document.getElementById('maxElevation')?.value ?? '',
+            pavement_type: document.getElementById('pavementType')?.value ?? ''
+        };
+        }
+
+        function areFiltersEmpty(filters) {
+        return !String(filters.distance_min).trim()
+            && !String(filters.distance_max).trim()
+            && !String(filters.elev_min).trim()
+            && !String(filters.elev_max).trim()
+            && !String(filters.pavement_type).trim();
+        }
+
+        function refreshActiveTab(filters = null) {
+        const activeTab = document.querySelector('.trails-tab.active')?.getAttribute('data-tab');
+        if (activeTab === 'public') {
+            filters ? loadPublicRoutes(filters) : loadPublicRoutes();
+        } else {
+            filters ? loadFavourites(filters) : loadFavourites();
+        }
+        }
+
+        function onFiltersChanged() {
+        const filters = getFilters();
+
+        // ✅ If all filters cleared → auto reload
+        if (areFiltersEmpty(filters)) {
+            clearTimeout(filtersDebounceTimer);
+            refreshActiveTab(null);
+            return;
+        }
+
+        // (optional debounce for live filtering – currently disabled)
+        clearTimeout(filtersDebounceTimer);
+        filtersDebounceTimer = setTimeout(() => {
+            // refreshActiveTab(filters);
+        }, 300);
+        }
+
+        // Attach listeners
+        ['minDistance','maxDistance','minElevation','maxElevation','pavementType'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', onFiltersChanged);
+        el.addEventListener('change', onFiltersChanged);
         });
-    });
+
+      
 });
 document.getElementById('nav-login-btn')?.addEventListener('click', function(e){
     e.preventDefault();

@@ -1,6 +1,7 @@
 <?php
-
-header('Content-Type: application/json');
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+header('Content-Type: application/json; charset=utf-8');
 
 $mysqli = new mysqli('localhost', 'root', '', 'trailforgex');
 if ($mysqli->connect_errno) {
@@ -13,12 +14,12 @@ $params = [];
 $types = '';
 
 if (!empty($_GET['distance_min'])) {
-    $where[] = 'distance_km >= ?';
+    $where[] = 'CAST(distance_km AS DECIMAL(10,3)) >= ?';
     $params[] = floatval($_GET['distance_min']);
     $types .= 'd';
 }
 if (!empty($_GET['distance_max'])) {
-    $where[] = 'distance_km <= ?';
+    $where[] = 'CAST(distance_km AS DECIMAL(10,3)) <= ?';
     $params[] = floatval($_GET['distance_max']);
     $types .= 'd';
 }
@@ -53,6 +54,7 @@ while($row = $res->fetch_assoc()) {
 $stmt->close();
 $mysqli->close();
 echo json_encode(['success' => true, 'routes' => $publics]);
+
 
 
 
