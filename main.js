@@ -1188,6 +1188,71 @@ function openRouteMapModal(route_id, routeTitle, routeMeta) {
         el.addEventListener('change', onFiltersChanged);
         });
 
+
+        // ===============================
+        // ACHIEVEMENTS PAGE MODAL (main.js)
+        // ===============================
+        (function initAchievementsPage(){
+            document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('achModal');
+            if (!modal) return; // not on achievements page
+        
+            const closeBtn = document.getElementById('achModalClose');
+        
+            function openAchModal(card){
+                const title = card.dataset.title || 'Achievement';
+                const desc  = card.dataset.desc  || '';
+                const icon  = card.dataset.icon  || '🏅';
+                const earned = card.dataset.earned === '1';
+                const earnedDate = card.dataset.earnedDate || '';
+                const points = card.dataset.points || '0';
+        
+                const titleEl = document.getElementById('achModalTitle');
+                const descEl  = document.getElementById('achModalDesc');
+                const iconEl  = document.getElementById('achModalIcon');
+                const subEl   = document.getElementById('achModalSub');
+                const statusEl= document.getElementById('achModalStatus');
+                const ptsEl   = document.getElementById('achModalPoints');
+        
+                if (titleEl) titleEl.textContent = title;
+                if (descEl)  descEl.textContent = desc;
+                if (iconEl)  iconEl.textContent = icon;
+        
+                if (subEl) {
+                subEl.textContent = earned
+                    ? (earnedDate ? `Earned on ${earnedDate}` : 'Earned')
+                    : 'Not earned yet';
+                }
+        
+                if (statusEl) statusEl.textContent = 'Status: ' + (earned ? 'Earned ✅' : 'Locked 🔒');
+                if (ptsEl) ptsEl.textContent = 'Points: ' + points;
+        
+                modal.style.display = 'flex';
+                modal.setAttribute('aria-hidden', 'false');
+            }
+        
+            function closeAchModal(){
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden', 'true');
+            }
+        
+            document.querySelectorAll('.ach-card').forEach(card => {
+                card.addEventListener('click', () => openAchModal(card));
+                card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openAchModal(card);
+                }
+                });
+            });
+        
+            closeBtn?.addEventListener('click', closeAchModal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeAchModal(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAchModal(); });
+            });
+        })();
+        
+
       
 });
 document.getElementById('nav-login-btn')?.addEventListener('click', function(e){

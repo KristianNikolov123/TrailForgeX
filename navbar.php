@@ -18,6 +18,7 @@ $is_logged_in = !!$user;
       <li><a href="trails.php" class="<?= $current_page=='trails.php' ? 'highlighted-nav' : '' ?>">Trails</a></li>
       <li><a href="generate.php" class="<?= $current_page=='generate.php' ? 'highlighted-nav' : '' ?>">Generate Route</a></li>
       <?php if ($is_logged_in): ?>
+        <li><a href="achievements.php" class="<?= $current_page=='achievements.php' ? 'highlighted-nav' : '' ?>">Achievements</a></li>
         <li><a href="profile.php" class="<?= $current_page=='profile.php' ? 'highlighted-nav' : '' ?>">Profile</a></li>
         <li><a href="logout.php">Logout</a></li>
       <?php else: ?>

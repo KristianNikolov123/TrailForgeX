@@ -909,3 +909,231 @@ footer {
     cursor:pointer;
   }
   
+
+  /* =========================
+   ACHIEVEMENTS PAGE
+   (paste near the end of master.css)
+========================= */
+
+.ach-main{
+    max-width: 980px;
+    margin: 2.2em auto 3em auto;
+    padding: 0 1.2em;
+  }
+  
+  .ach-hero{
+    background: linear-gradient(120deg,#25121e 75%,#341c37 110%);
+    border: 1.5px solid #310c19;
+    border-radius: 18px;
+    box-shadow: 0 10px 55px #ea5f9425;
+    padding: 1.4em 1.6em;
+    margin-bottom: 1.3em;
+    display:flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1em;
+    flex-wrap: wrap;
+  }
+  
+  .ach-hero h2{
+    color:#ea5f94;
+    font-size: 2rem;
+    letter-spacing: 1px;
+    margin:0;
+  }
+  
+  .ach-hero p{
+    margin:.35em 0 0 0;
+    color:#e6bfd6;
+    font-weight:600;
+  }
+  
+  .ach-stats{
+    display:flex;
+    gap:.8em;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  
+  .ach-pill{
+    background:#2b1d29;
+    border:1px solid #441126;
+    color:#ffdff7;
+    font-weight:900;
+    padding:.55em .9em;
+    border-radius: 999px;
+    box-shadow: 0 6px 22px #00000025;
+    font-size: .98rem;
+    white-space: nowrap;
+  }
+  
+  .ach-grid{
+    display:grid;
+    gap: 1em;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  
+  .ach-card{
+    background: linear-gradient(120deg,#250e16 60%,#2c1936 95%);
+    border: 1.5px solid #310c19;
+    border-radius: 16px;
+    box-shadow: 0 8px 36px #ea5f9420;
+    padding: 1em 1.05em;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease, border .12s ease;
+    position: relative;
+    overflow:hidden;
+  }
+  
+  .ach-card:hover{
+    transform: translateY(-4px);
+    box-shadow: 0 14px 48px #ea5f9445;
+    border-color: #ea5f94;
+  }
+  
+  .ach-card.locked{
+    opacity: .62;
+    filter: saturate(.8);
+  }
+  
+  .ach-top{
+    display:flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .8em;
+  }
+  
+  .ach-icon{
+    font-size: 2rem;
+    line-height: 1;
+    background: rgba(234,95,148,0.12);
+    border: 1px solid rgba(234,95,148,0.25);
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 6px 18px #ea5f9415;
+    flex: 0 0 auto;
+  }
+  
+  .ach-title{
+    color:#fff;
+    font-weight: 900;
+    font-size: 1.05rem;
+    margin: 0;
+    line-height: 1.2;
+  }
+  
+  .ach-desc{
+    color:#e6bfd6;
+    margin: .65em 0 0 0;
+    line-height: 1.35;
+    font-weight: 600;
+    font-size: .98rem;
+  }
+  
+  .ach-mini-meta{
+    margin-top:.35em;
+    color:#cbb1cd;
+    font-weight:900;
+  }
+  
+  .ach-badge{
+    position:absolute;
+    top: .85em;
+    right: .85em;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: .35em .6em;
+    border-radius: 999px;
+    color:#ffdff7;
+    font-weight: 900;
+    font-size: .84rem;
+    letter-spacing: .3px;
+  }
+  
+  .ach-badge.earned{
+    background: rgba(101,230,140,0.16);
+    border-color: rgba(101,230,140,0.25);
+    color: #bff8cf;
+  }
+  
+  /* Modal */
+  #achModal{
+    display:none;
+    align-items:center;
+    justify-content:center;
+    position:fixed;
+    inset:0;
+    background: rgba(27,14,22, 0.93);
+    z-index: 2500;
+    padding: 1.2em;
+  }
+  
+  .ach-modal-card{
+    width: min(520px, 96vw);
+    background: #2f1723;
+    border-radius: 16px;
+    box-shadow: 0 14px 70px #ea5f9448;
+    border: 1.5px solid #310c19;
+    padding: 1.6em 1.7em;
+    position:relative;
+    color:#f8eef7;
+  }
+  
+  .ach-modal-close{
+    position:absolute;
+    right:1.1em;
+    top:.8em;
+    border:none;
+    background:none;
+    color:#ea5f94;
+    font-size: 2rem;
+    cursor:pointer;
+  }
+  
+  .ach-modal-head{
+    display:flex;
+    align-items:center;
+    gap: .9em;
+    margin-bottom: .8em;
+  }
+  
+  .ach-modal-icon{
+    font-size: 2.1rem;
+    width: 58px; height: 58px;
+    border-radius: 16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: rgba(234,95,148,0.12);
+    border: 1px solid rgba(234,95,148,0.25);
+  }
+  
+  .ach-modal-title{
+    margin:0;
+    font-size: 1.35rem;
+    font-weight: 950;
+    color:#fff;
+  }
+  
+  .ach-modal-sub{
+    margin:.25em 0 0 0;
+    color:#e6bfd6;
+    font-weight: 700;
+  }
+  
+  .ach-modal-meta{
+    margin-top: 1em;
+    padding-top: 1em;
+    border-top: 1px solid #512545;
+    color:#cbb1cd;
+    font-weight: 700;
+    display:flex;
+    justify-content: space-between;
+    gap: .8em;
+    flex-wrap: wrap;
+  }
+  
