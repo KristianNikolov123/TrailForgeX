@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$route_id) {
 }
 
 require_once '../../dbconn.php';
-if ($mysqli->connect_errno) {
+if ($connection->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'Database connection failed.']);
     exit;
 }

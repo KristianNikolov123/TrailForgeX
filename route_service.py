@@ -61,20 +61,39 @@ class RouteRequest(BaseModel):
     prefer: str  # "green" | "trail" | "road"
 
 
+from pydantic import BaseModel, Field, model_validator
+from typing import Optional, Literal
+
+Mode = Literal["loop_in_area", "loop_from_start", "point_to_point"]
+
 class Generate3Request(BaseModel):
     distance_km: float
     elevation_gain_target: Optional[float] = None
     prefer: str = "green"
 
-    # how many candidate routes to return
     n_routes: int = Field(default=3, ge=1, le=3)
+    mode: Mode = "loop_in_area"
 
-    # for “no start / no end” generation (generate around a center point)
-    center_lat: float
-    center_lng: float
+    # area mode
+    center_lat: Optional[float] = None
+    center_lng: Optional[float] = None
 
-    # optional mode (you can ignore it if you want)
-    mode: str = "loop_in_area"
+    # start mode
+    start_lat: Optional[float] = None
+    start_lng: Optional[float] = None
+    end_lat: Optional[float] = None
+    end_lng: Optional[float] = None
+
+    @model_validator(mode="after")
+    def validate_by_mode(self):
+        if self.mode == "loop_in_area":
+            if self.center_lat is None or self.center_lng is None:
+                raise ValueError("center_lat and center_lng are required for loop_in_area")
+        else:
+            if self.start_lat is None or self.start_lng is None:
+                raise ValueError("start_lat and start_lng are required for start-based modes")
+        return self
+
 
 
 # ----------------------------
@@ -393,7 +412,13 @@ def generate3(req: Generate3Request):
     random.seed(time.time_ns())
 
     target_m = req.distance_km * 1000.0
-    center = (req.center_lat, req.center_lng)
+    if req.mode == "loop_in_area":
+        center_lat, center_lng = req.center_lat, req.center_lng
+    else:
+        # loop_from_start / point_to_point use start as the center for graph download
+        center_lat, center_lng = req.start_lat, req.start_lng
+
+    center = (center_lat, center_lng)
     radius = compute_radius_loop(req.distance_km)
 
     try:
@@ -411,7 +436,8 @@ def generate3(req: Generate3Request):
     apply_mode_weights(G, req.prefer, strength=0.70 if req.prefer == "green" else 0.65, noise=0.03)
 
     # ✅ start inside a green polygon if possible (otherwise near center)
-    start_node = pick_start_node(G, req.center_lat, req.center_lng, req.prefer, green_union)
+    start_node = pick_start_node(G, center_lat, center_lng, req.prefer, green_union)
+
 
     loops = build_loop_candidates(G, start_node, target_m, count=req.n_routes)
 

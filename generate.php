@@ -133,11 +133,11 @@ $route_id = null;
       <?php endif; ?>
 
       <div class="route-actions" style="margin-top:1rem; display:flex; gap:0.85rem;">
-        <button class="btn-favourite" id="favouriteRouteBtn" type="button" title="Add to Favourites">
+        <button class="btn-favourite" id="favouriteRouteBtn" disabled type="button" title="Add to Favourites">
           <span id="favouriteIcon" style="font-size:1.5em;color:#ea5f94;">☆</span> Favourite
         </button>
         <button class="btn-share" id="shareRouteBtn" type="button" title="Share this Route">
-          <span style="font-size:1.3em;">🔗</span> Share
+          <span style="font-size:1.3em;">🔗</span> Publish
         </button>
       </div>
 

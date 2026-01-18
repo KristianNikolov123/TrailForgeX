@@ -2,6 +2,8 @@
 session_start();
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/../achievements/award.php';
+
 // Must be logged in
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'error' => 'You must be logged in.']);
@@ -31,8 +33,6 @@ if (!$route_id) {
 
 // DB
 require_once __DIR__ . '/../../dbconn.php';
-
-// dbconn.php should define $connection (mysqli)
 if (!isset($connection) || !($connection instanceof mysqli) || $connection->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'Database connection failed.']);
     exit;
@@ -50,6 +50,9 @@ $query->store_result();
 $already_fav = $query->num_rows > 0;
 $query->close();
 
+$action = null;   // ✅ track what happened
+$success = false; // ✅ track whether DB operation worked
+
 if ($already_fav) {
     $del = $connection->prepare("DELETE FROM favorites WHERE user_id = ? AND route_id = ?");
     if (!$del) {
@@ -57,9 +60,12 @@ if ($already_fav) {
         exit;
     }
     $del->bind_param('ii', $user_id, $route_id);
-    $ok = $del->execute();
+    $success = $del->execute();
     $del->close();
-    echo json_encode(['success' => (bool)$ok, 'action' => 'removed']);
+
+    $action = 'removed';
+    echo json_encode(['success' => (bool)$success, 'action' => $action]);
+
 } else {
     $ins = $connection->prepare("INSERT INTO favorites (user_id, route_id) VALUES (?, ?)");
     if (!$ins) {
@@ -67,9 +73,22 @@ if ($already_fav) {
         exit;
     }
     $ins->bind_param('ii', $user_id, $route_id);
-    $ok = $ins->execute();
+    $success = $ins->execute();
     $ins->close();
-    echo json_encode(['success' => (bool)$ok, 'action' => 'added']);
+
+    $action = 'added';
+    $unlocked = null;
+
+    if ($success && $action === 'added') {
+        $unlocked = awardAchievement($connection, $user_id, 'first_favourite');
+    }
+    
+    echo json_encode([
+        'success' => (bool)$success,
+        'action' => $action,
+        'achievement_unlocked' => $unlocked // null or object
+    ]);
+    
 }
 
 $connection->close();

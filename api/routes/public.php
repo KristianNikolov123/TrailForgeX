@@ -53,9 +53,44 @@ while($row = $res->fetch_assoc()) {
 }
 $stmt->close();
 $mysqli->close();
+session_start();
+$fav_ids = [];
+if (isset($_SESSION['user_id'])) {
+    $user_id = intval($_SESSION['user_id']);
+    $mysqli2 = new mysqli('localhost', 'root', '', 'trailforgex');
+    if (!$mysqli2->connect_errno) {
+        $sqlfavs = "SELECT route_id FROM favorites WHERE user_id = ?";
+        $s2 = $mysqli2->prepare($sqlfavs);
+        $s2->bind_param('i', $user_id);
+        $s2->execute();
+        $res2 = $s2->get_result();
+        while ($r = $res2->fetch_assoc()) {
+            $fav_ids[$r['route_id']] = 1;
+        }
+        $s2->close();
+        $mysqli2->close();
+    }
+}
+// Get all saved (pinned) route IDs
+$saved_ids = [];
+if (isset($_SESSION['user_id'])) {
+    $user_id = intval($_SESSION['user_id']);
+    $mys = new mysqli('localhost', 'root', '', 'trailforgex');
+    if (!$mys->connect_errno) {
+        $sqlsaved = "SELECT route_id FROM saved_routes WHERE user_id = ?";
+        $s3 = $mys->prepare($sqlsaved);
+        $s3->bind_param('i', $user_id);
+        $s3->execute();
+        $res3 = $s3->get_result();
+        while ($s = $res3->fetch_assoc()) {
+            $saved_ids[$s['route_id']] = 1;
+        }
+        $s3->close();
+        $mys->close();
+    }
+}
+foreach ($publics as &$row) {
+    $row['is_favourited'] = isset($fav_ids[$row['id']]) ? 1 : 0;
+    $row['is_saved'] = isset($saved_ids[$row['id']]) ? 1 : 0;
+}
 echo json_encode(['success' => true, 'routes' => $publics]);
-
-
-
-
-

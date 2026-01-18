@@ -67,10 +67,20 @@ $stmt->execute();
 
 $result = $stmt->get_result();
 $favs = [];
+// build list of saved (pinned) route IDs outside the loop
+$pinned = [];
+$pins = $mysqli->prepare("SELECT route_id FROM saved_routes WHERE user_id = ?");
+$pins->bind_param("i", $user_id);
+$pins->execute();
+$pres = $pins->get_result();
+while ($pr = $pres->fetch_assoc()) { $pinned[$pr['route_id']] = 1; }
+$pins->close();
+
 while ($row = $result->fetch_assoc()) {
+    $row['is_favourited'] = 1; // Always true in user's favourite list
+    $row['is_saved'] = isset($pinned[$row['id']]) ? 1 : 0;
     $favs[] = $row;
 }
-
 $stmt->close();
 $mysqli->close();
 

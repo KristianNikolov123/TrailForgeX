@@ -15,6 +15,7 @@ include "navbar.php";
     <main class="trails-main">
         <h1>Trails</h1>
         <div class="trails-tabs">
+            <button class="trails-tab" data-tab="todo">📌 To-Do</button>
             <button class="trails-tab active" data-tab="favourites">⭐ Favourites</button>
             <button class="trails-tab" data-tab="public">🌍 Public Routes</button>
         </div>

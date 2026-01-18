@@ -697,26 +697,63 @@ footer {
      FAVOURITE STAR
   ========================= */
   
-  .trails-fav-star {
-    position: absolute;
-    top: 0.7em;
-    right: 1em;
-    font-size: 2em;
-    color: #ffc300;
-    background: rgba(44,19,33,.9);
-    border-radius: 50%;
-    padding: .1em .25em;
-    box-shadow: 0 4px 18px #ea5f9433;
-    z-index: 4;
-    opacity: 0;
-    transition: opacity .15s ease;
-    pointer-events: auto;
+  /* --- Pin & Star Sizes, Alignment, Less Overlay Overlap --- */
+  /* --- FIXED: Pin & Star Icons Always Visible, Small & Consistent, Emoji Safe --- */
+.trails-fav-star,
+.trails-save-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.32em !important;
+  width: 2em;
+  height: 2em;
+  background: rgba(44,19,33,.92);
+  border-radius: 50%;
+  box-shadow: 0 4px 18px #ea5f9433;
+  position: absolute;
+  z-index: 5;
+  padding: 0;
+  border: none;
+  top: .35em;
+
+}
+
+.trails-fav-star {
+  right: 1.1em;
+  color: #ffc300; /* For star */
+}
+.trails-save-pin {
+  right: 3.15em;
+}
+
+.trails-route-names-overlay { padding-top: 2em; }
+
+
+  .trails-route-names-overlay {
+    padding-top: 2.1em;
   }
+
+
   
-  .trails-route-card:hover .trails-fav-star {
+  /* on hover/focus, make it pop */
+  .trails-route-card:hover .trails-fav-star,
+  .trails-route-card:focus-within .trails-fav-star{
     opacity: 1;
+    transform: scale(1.05);
+  }
+
+  
+  .trails-route-map-mini,
+  .trails-route-map-mini * {
+    pointer-events: none;
+  }
+
+  
+  @media (hover: none), (pointer: coarse) {
+    .trails-fav-star { opacity: 1; }
   }
   
+
   /* =========================
      NO ROUTES
   ========================= */
@@ -1135,5 +1172,211 @@ footer {
     justify-content: space-between;
     gap: .8em;
     flex-wrap: wrap;
+  }
+  
+
+  /* =========================
+   PROFILE: Achievements preview
+========================= */
+
+.profile-achievements{ margin-top: 1.2em; }
+
+.profile-ach-head{
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  gap: 1em;
+  margin-bottom: .9em;
+}
+
+.profile-ach-head h3{
+  color:#ea5f94;
+  font-size: 1.25rem;
+  font-weight: 900;
+  margin:0;
+  letter-spacing: .5px;
+}
+
+.profile-ach-viewall{
+  color:#e6bfd6;
+  text-decoration:none;
+  font-weight: 900;
+  padding: .38em .85em;
+  border-radius: 12px;
+  background: #2b1d29;
+  border: 1px solid #441126;
+  box-shadow: 0 6px 22px #00000022;
+}
+
+.profile-ach-viewall:hover{
+  transform: scale(1.03);
+  color:#fff;
+}
+
+.profile-ach-row{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .9em;
+}
+
+.profile-ach-card{
+  background: linear-gradient(120deg,#25121e 85%,#341c37 100%);
+  border: 1.5px solid #310c19;
+  border-radius: 14px;
+  padding: .95em .85em;
+  box-shadow: 0 10px 35px #ea5f9420;
+  text-decoration:none;
+  transition: transform .12s ease, box-shadow .12s ease, border .12s ease;
+  text-align:center;
+  color:#fff;
+}
+
+.profile-ach-card:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 16px 52px #ea5f9448;
+  border-color:#ea5f94;
+}
+
+.profile-ach-icon{
+  font-size: 2.2rem;
+  margin-bottom: .35em;
+}
+
+.profile-ach-title{
+  font-weight: 950;
+  color:#ffdff7;
+  line-height: 1.2;
+}
+
+.profile-ach-date{
+  margin-top: .35em;
+  color:#cbb1cd;
+  font-weight: 800;
+  font-size: .92rem;
+}
+
+.profile-ach-empty{
+  background:#2b1d29;
+  border: 1px solid #441126;
+  border-radius: 14px;
+  padding: 1.1em 1.1em;
+  color:#e6bfd6;
+  font-weight: 700;
+  box-shadow: 0 10px 35px #00000022;
+}
+
+.profile-ach-hint{
+  margin-top: .8em;
+  color:#a58aa7;
+  font-weight: 650;
+  font-size: .95rem;
+}
+
+@media (max-width: 560px){
+  .profile-ach-row{ grid-template-columns: 1fr; }
+}
+
+
+/* =========================
+   ACHIEVEMENT UNLOCK TOAST
+========================= */
+
+.toast-wrap{
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 5000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+  }
+  
+  .ach-toast{
+    width: min(360px, 92vw);
+    background: linear-gradient(120deg,#2f1723 70%,#341c37 110%);
+    border: 1.5px solid rgba(234,95,148,0.35);
+    border-radius: 16px;
+    box-shadow: 0 18px 70px rgba(234,95,148,0.35);
+    padding: 1rem 1.1rem;
+    color: #fff;
+    pointer-events: auto;
+    transform: translateY(8px);
+    opacity: 0;
+    animation: toastIn .22s ease forwards;
+  }
+  
+  @keyframes toastIn{
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  .ach-toast .row{
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+  }
+  
+  .ach-toast .icon{
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: rgba(234,95,148,0.14);
+    border: 1px solid rgba(234,95,148,0.25);
+    font-size: 1.8rem;
+    flex: 0 0 auto;
+  }
+  
+  .ach-toast .title{
+    font-weight: 950;
+    letter-spacing: .3px;
+    margin: 0;
+    font-size: 1.02rem;
+  }
+  
+  .ach-toast .desc{
+    margin: .25rem 0 0 0;
+    color: #e6bfd6;
+    font-weight: 700;
+    line-height: 1.25;
+    font-size: .93rem;
+  }
+  
+  .ach-toast .meta{
+    margin-top: .6rem;
+    display: flex;
+    justify-content: space-between;
+    gap: .8rem;
+    color: #cbb1cd;
+    font-weight: 900;
+    font-size: .88rem;
+  }
+  
+  .ach-toast .actions{
+    margin-top: .65rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: .6rem;
+  }
+  
+  .ach-toast button{
+    border: none;
+    border-radius: 10px;
+    padding: .45rem .85rem;
+    font-weight: 900;
+    cursor: pointer;
+  }
+  
+  .ach-toast .btn-view{
+    background: linear-gradient(90deg,#ea5f94 55%,#e67e22 100%);
+    color: #fff;
+  }
+  
+  .ach-toast .btn-close{
+    background: rgba(255,255,255,0.08);
+    color: #ffdff7;
+    border: 1px solid rgba(255,255,255,0.12);
   }
   

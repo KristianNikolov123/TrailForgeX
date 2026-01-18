@@ -102,15 +102,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 /* =========================
    LOAD USER DATA
 ========================= */
-$stmt = $connection->prepare(
-    'SELECT username, email, profile_image, bio, created_at
-     FROM users WHERE id = ?'
-);
+$stmt = $connection->prepare('
+  SELECT username, email, profile_image, bio, created_at,
+         featured_badge_1, featured_badge_2, featured_badge_3
+  FROM users WHERE id = ?
+');
 $stmt->bind_param('i', $user_id);
 $stmt->execute();
-$stmt->bind_result($username, $email, $profile_image, $bio, $created_at);
+$stmt->bind_result($username, $email, $profile_image, $bio, $created_at,
+                   $fb1, $fb2, $fb3);
+
 $stmt->fetch();
 $stmt->close();
+
+$featuredIds = array_values(array_filter([$fb1, $fb2, $fb3], fn($x) => !empty($x)));
+
+$badgesToShow = [];
+
+/* If user has featured badges, show them (only if earned) */
+if (!empty($featuredIds)) {
+  $in = implode(',', array_fill(0, count($featuredIds), '?'));
+  $types = str_repeat('i', count($featuredIds) + 1);
+
+  $sql = "
+    SELECT a.id, a.title, a.icon, ua.earned_at
+    FROM achievements a
+    JOIN user_achievements ua
+      ON ua.achievement_id = a.id AND ua.user_id = ?
+    WHERE a.id IN ($in)
+  ";
+
+  $stmt2 = $connection->prepare($sql);
+  $params = array_merge([$user_id], $featuredIds);
+
+  // bind_param needs references
+  $bind = [];
+  $bind[] = $types;
+  foreach ($params as $k => $v) $bind[] = &$params[$k];
+
+  call_user_func_array([$stmt2, 'bind_param'], $bind);
+  $stmt2->execute();
+  $res = $stmt2->get_result();
+  $rows = $res->fetch_all(MYSQLI_ASSOC);
+  $stmt2->close();
+
+  // Keep order according to featuredIds
+  $byId = [];
+  foreach ($rows as $r) $byId[(int)$r['id']] = $r;
+  foreach ($featuredIds as $id) {
+    if (isset($byId[(int)$id])) $badgesToShow[] = $byId[(int)$id];
+  }
+}
+
+/* Fallback: latest earned badges (top 3) */
+if (count($badgesToShow) < 3) {
+  $stmt3 = $connection->prepare("
+    SELECT a.id, a.title, a.icon, ua.earned_at
+    FROM user_achievements ua
+    JOIN achievements a ON a.id = ua.achievement_id
+    WHERE ua.user_id = ?
+    ORDER BY ua.earned_at DESC
+    LIMIT 3
+  ");
+  $stmt3->bind_param('i', $user_id);
+  $stmt3->execute();
+  $res3 = $stmt3->get_result();
+  $badgesToShow = $res3->fetch_all(MYSQLI_ASSOC);
+  $stmt3->close();
+}
+
 
 include 'navbar.php';
 ?>
@@ -171,6 +231,39 @@ include 'navbar.php';
     <div style="color:#968dab;font-size:.94em;">
         Joined: <?= htmlspecialchars(date('Y-m-d', strtotime($created_at))) ?>
     </div>
+    <hr style="margin:2em 0 1.1em 0;border-color:#512545;">
+
+    <section class="profile-achievements">
+    <div class="profile-ach-head">
+        <h3>Achievements</h3>
+        <a class="profile-ach-viewall" href="achievements.php">View all</a>
+    </div>
+
+    <?php if (empty($badgesToShow)): ?>
+        <div class="profile-ach-empty">
+        No achievements yet. Generate, save, favourite, or share routes to earn badges.
+        <div style="margin-top:.8em;">
+            <a class="cta-button" style="display:inline-block;padding:.55em 1.2em;" href="generate.php">Generate a route</a>
+        </div>
+        </div>
+    <?php else: ?>
+        <div class="profile-ach-row">
+        <?php foreach ($badgesToShow as $b): ?>
+            <a class="profile-ach-card" href="achievements.php#ach_<?= (int)$b['id'] ?>">
+            <div class="profile-ach-icon"><?= htmlspecialchars($b['icon']) ?></div>
+            <div class="profile-ach-title"><?= htmlspecialchars($b['title']) ?></div>
+            <div class="profile-ach-date">
+                <?= htmlspecialchars(date('Y-m-d', strtotime($b['earned_at']))) ?>
+            </div>
+            </a>
+        <?php endforeach; ?>
+        </div>
+        <div class="profile-ach-hint">
+        Tip: on the Achievements page you’ll be able to pick 3 badges to feature on your profile.
+        </div>
+    <?php endif; ?>
+    </section>
+
 
     <hr style="margin:2em 0 1.1em 0;border-color:#512545;">
 

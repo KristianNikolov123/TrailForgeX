@@ -504,6 +504,83 @@ if (genForm) {
   });
 }
 
+// ===============================
+// Trails tab state (GLOBAL)
+// ===============================
+let currentTrailsTab = 'favourites'; // preventDefault
+// ===============================
+// Filters (GLOBAL so both DOMContentLoaded blocks can access)
+// ===============================
+let filtersDebounceTimer = null;
+
+function getFilters() {
+  return {
+    distance_min: document.getElementById('minDistance')?.value ?? '',
+    distance_max: document.getElementById('maxDistance')?.value ?? '',
+    elev_min: document.getElementById('minElevation')?.value ?? '',
+    elev_max: document.getElementById('maxElevation')?.value ?? '',
+    pavement_type: document.getElementById('pavementType')?.value ?? ''
+  };
+}
+
+function areFiltersEmpty(filters) {
+  return !String(filters.distance_min).trim()
+      && !String(filters.distance_max).trim()
+      && !String(filters.elev_min).trim()
+      && !String(filters.elev_max).trim()
+      && !String(filters.pavement_type).trim();
+}
+
+function refreshActiveTab(filters = null) {
+  if (currentTrailsTab === 'public') {
+    return filters ? loadPublicRoutes(filters) : loadPublicRoutes();
+  }
+  if (currentTrailsTab === 'todo') {
+    return filters ? loadTodoRoutes(filters) : loadTodoRoutes();
+  }
+  return filters ? loadFavourites(filters) : loadFavourites();
+}
+
+
+function onFiltersChanged() {
+  const filters = getFilters();
+
+  // If all filters cleared → auto reload
+  if (areFiltersEmpty(filters)) {
+    clearTimeout(filtersDebounceTimer);
+    refreshActiveTab(null);
+    return;
+  }
+
+  clearTimeout(filtersDebounceTimer);
+  filtersDebounceTimer = setTimeout(() => {
+    // refreshActiveTab(filters); // enable if you want live filtering
+  }, 300);
+}
+
+
+function setTrailsTab(tabName) {
+  currentTrailsTab = tabName;
+
+  document.querySelectorAll('.trails-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.trails-tab[data-tab="${tabName}"]`)?.classList.add('active');
+}
+
+document.querySelectorAll('.trails-tab').forEach(tab => {
+  tab.addEventListener('click', function () {
+    const which = this.getAttribute('data-tab');
+
+    // ✅ update state + active class
+    setTrailsTab(which);
+
+    // ✅ load correct list
+    if (which === 'public') loadPublicRoutes();
+    else if (which === 'todo') loadTodoRoutes();
+    else loadFavourites();
+  });
+});
+
+
 // =============================================
 // UI: render 3 route cards + let user pick one
 // =============================================
@@ -566,42 +643,55 @@ function renderRouteChoices(routes) {
       setTimeout(() => displayRoute(r), 250);
 
       // Save ONLY the selected route (so DB doesn't get 3 per request)
-      try {
-        const saveData = {
-          coordinates: r.coordinates,
-          title: r.title || 'Generated Route',
-          activity_type: document.getElementById('prefer')?.value || 'green',
-          description: r.description || '',
-          start_lat: (r.start_lat != null ? r.start_lat : null),
-          start_lng: (r.start_lng != null ? r.start_lng : null),
-          distance_km: r.distance_km,
-          elevation_gain_m: r.elevation_gain_m
-        };
-
-        const saveResp = await fetch('api/routes/save.php', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(saveData)
-        });
-
-        const saveResult = await saveResp.json();
-        if (saveResult.success && saveResult.route_id) {
-          window.currentRouteId = saveResult.route_id;
-
-          let idHidden = document.getElementById('currentRouteId');
-          if (!idHidden) {
+      // Save ONLY the selected route (so DB doesn't get 3 per request)
+        try {
+            const saveData = {
+            coordinates: r.coordinates,
+            title: r.title || 'Generated Route',
+            activity_type: document.getElementById('prefer')?.value || 'green',
+            description: r.description || '',
+            start_lat: (r.start_lat != null ? r.start_lat : null),
+            start_lng: (r.start_lng != null ? r.start_lng : null),
+            distance_km: r.distance_km,
+            elevation_gain_m: r.elevation_gain_m
+            };
+        
+            const saveResp = await fetch('api/routes/save.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(saveData)
+            });
+        
+            const raw = await saveResp.text();
+            let saveResult;
+            try { saveResult = JSON.parse(raw); }
+            catch { throw new Error('save.php returned non-JSON: ' + raw.slice(0, 200)); }
+        
+            console.log('save.php result:', saveResult);
+        
+            if (!saveResp.ok || !saveResult.success || !saveResult.route_id) {
+            throw new Error(saveResult.error || 'Save failed');
+            }
+        
+            window.currentRouteId = saveResult.route_id;
+        
+            const favBtn = document.getElementById('favouriteRouteBtn');
+            if (favBtn) favBtn.disabled = false;
+        
+            let idHidden = document.getElementById('currentRouteId');
+            if (!idHidden) {
             idHidden = document.createElement('input');
             idHidden.type = 'hidden';
             idHidden.id = 'currentRouteId';
             document.body.appendChild(idHidden);
-          }
-          idHidden.value = saveResult.route_id;
-        } else {
-          console.warn('Route save failed:', saveResult.error);
+            }
+            idHidden.value = saveResult.route_id;
+        
+        } catch (err) {
+            console.warn('Save error:', err);
+            alert('Route was not saved, cannot favourite. Error: ' + (err.message || 'unknown'));
         }
-      } catch (err) {
-        console.warn('Save error:', err);
-      }
+  
 
       // Scroll to map
       routeResult?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -610,13 +700,429 @@ function renderRouteChoices(routes) {
     choicesWrap.appendChild(card);
   });
 }
+function initMiniRouteMap(minimapId, routeId) {
+    fetch('api/routes/get_route_points.php?route_id=' + encodeURIComponent(routeId), {
+      credentials: 'same-origin'
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success || !data.coordinates || !data.coordinates.length) return;
+  
+        const container = document.getElementById(minimapId);
+        if (!container) return;
+  
+        const miniMap = L.map(minimapId, {
+          zoomControl: false,
+          attributionControl: false,
+          dragging: false,
+          scrollWheelZoom: false,
+          doubleClickZoom: false,
+          boxZoom: false,
+          keyboard: false,
+          tap: false,
+          touchZoom: false
+        });
+  
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 17
+        }).addTo(miniMap);
+  
+        const latlngs = data.coordinates.map(p => [p[0], p[1]]);
+        const line = L.polyline(latlngs, { color: '#ea5f94', weight: 5, opacity: 0.95 }).addTo(miniMap);
+  
+        miniMap.fitBounds(line.getBounds(), { padding: [20, 20], maxZoom: 16 });
+  
+        setTimeout(() => miniMap.invalidateSize(true), 100);
+      })
+      .catch(err => console.warn('initMiniRouteMap error:', err));
+  }
+  
 
+// --- Route Card Rendering: renderRoutes (Global Scope) ---
+function renderRoutes(list, routes) {
+    list.innerHTML = '';
+  
+    if (!routes.length) {
+      list.innerHTML = '<div class="no-routes">No routes to show.</div>';
+      return;
+    }
+  
+    for (const route of routes) {
+      const div = document.createElement('div');
+      div.className = 'trails-route-card';
+      div.tabIndex = 0;
+  
+      function formatPointName(name, lat, lng, fallback) {
+        if (name && String(name).trim()) return name;
+        if (lat != null && lng != null) {
+          return `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+        }
+        return fallback;
+      }
+      
+      const startName = formatPointName(
+        route.start_name,
+        route.start_lat,
+        route.start_lng,
+        'Start'
+      );
+      
+      const endName = formatPointName(
+        route.end_name,
+        route.end_lat,
+        route.end_lng,
+        route.mode === 'loop_from_start' ? 'Loop' : 'End'
+      );
+      
+      const routeLabel = `${startName} → ${endName}`      
+      const minimapId = `minimap_${route.id}`;
+      const isFav = route.is_favourited == 1;
+      const isSaved = String(route.is_saved || 0) === '1';
+  
+      div.innerHTML = `
+        <div class="trails-route-map-mini">
+          <div id="${minimapId}" class="trails-route-map-mini-inner"></div>
+        </div>
+  
+        <div class="trails-route-names-overlay">
+          🌄 ${routeLabel}
+        </div>
+  
+        <div class="trails-route-stats-overlay">
+          <span>${Number(route.distance_km).toFixed(2)} km</span>
+          <span>⬆ ${route.elevation_gain_m} m</span>
+        </div>
+  
+        <span class="trails-fav-star" data-route-id="${route.id}" tabindex="0" style="opacity:${isFav ? 1 : 0.35};">
+          ${isFav ? '★' : '☆'}
+        </span>
+  
+        <span class="trails-save-pin" data-route-id="${route.id}" tabindex="0"
+            style="opacity:${isSaved ? 1 : 0.35};">
+            ${isSaved ? '📌' : '📍'}
+        </span>
+      `;
+  
+      div.addEventListener('click', (e) => {
+        if (e.target.closest('.trails-fav-star') || e.target.closest('.trails-save-pin')) return;
+        openRouteMapModal(route.id, routeLabel, route);
+      });
+      list.appendChild(div);
+      setTimeout(() => initMiniRouteMap(minimapId, route.id), 50);
+    }
+  }
+  
+        
+  
+        
+  // --- Map Modal for Viewing Public/Favourite Route ---
+  function openRouteMapModal(route_id, routeTitle, routeMeta) {
+      let modal = document.getElementById('routeMapModal');
+    
+      // Helper: close modal + cleanup esc listener
+      const closeModal = () => {
+        if (!modal) return;
+        modal.style.display = 'none';
+        if (modal._escHandler) {
+          document.removeEventListener('keydown', modal._escHandler);
+          modal._escHandler = null;
+        }
+      };
+    
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'routeMapModal';
+        modal.style = 'position:fixed; top:0; left:0; width:100vw;height:100vh;background:rgba(24,13,39,0.98); z-index:2050; display:flex; align-items:center;justify-content:center;';
+    
+        modal.innerHTML = `
+          <div id="routeMapModalCard"
+               style="background:#2f1723;color:#f8eef7;min-width:300px;width:95vw; max-width:510px; min-height:350px;border-radius:18px;box-shadow:0 12px 56px #ea5f9470;position:relative;padding:2rem 2.25rem;display:flex;flex-direction:column;gap:1.1em;align-items:center;">
+            <button id="closeRouteMapModal"
+                    aria-label="Close"
+                    style="position:absolute; top:0.65em; right:1.1em; border:none; background:none;color:#ea5f94;font-size:2em;cursor:pointer;">&times;</button>
+            <div style="font-size:1.33em;font-weight:bold;margin-bottom:.4em;">${routeTitle || 'Route Map'}</div>
+            <div id="modalMapMeta"></div>
+            <div id="routeMapContainer"
+                 style="width:100%;min-width:270px; height:320px; background:#242; border-radius:9px; box-shadow:0 2px 19px #ea5f9412;"></div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+    
+        // ✅ Close when clicking outside the card (overlay click)
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) closeModal();
+        });
+    
+        // ✅ Close button
+        modal.querySelector('#closeRouteMapModal').addEventListener('click', closeModal);
+      } else {
+        modal.style.display = 'flex';
+        // Update title each time (since innerHTML isn't rebuilt)
+        const card = modal.querySelector('#routeMapModalCard');
+        if (card) {
+          const titleDiv = card.querySelector('div');
+          if (titleDiv) titleDiv.textContent = routeTitle || 'Route Map';
+        }
+      }
+    
+      // Render metadata if available
+      document.getElementById('modalMapMeta').innerHTML = routeMeta
+        ? `<span style='color:#ddc2e0;'>Created: ${routeMeta.created_at && routeMeta.created_at.split(' ')[0]}</span><br><span style='color:#bbdaae;'>${routeMeta.description || ''}</span>`
+        : '';
+    
+      // ✅ Close on ESC
+      modal._escHandler = (ev) => {
+        if (ev.key === 'Escape') closeModal();
+      };
+      document.addEventListener('keydown', modal._escHandler);
+    
+      // Fetch and show the map
+      fetch('api/routes/get_route_points.php?route_id=' + route_id)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success || !data.coordinates.length) {
+            document.getElementById('routeMapContainer').innerHTML =
+              '<div style="color:#eb9aac;padding:2em;text-align:center;">No points found for this route.</div>';
+            return;
+          }
+          setTimeout(() => showModalMap('routeMapContainer', data.coordinates), 120);
+        });
+    }
+    
+  
+    function showModalMap(containerId, coords) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+    
+      // Create an inner div ONLY inside the container
+      const mapId = "modalMap_" + Math.floor(Math.random() * 1e8);
+      container.innerHTML = `<div id="${mapId}" style="background:#222246;width:100%;height:320px;border-radius:9px;box-shadow:0 2px 19px #ea5f9412;"></div>`;
+    
+      setTimeout(() => {
+        const modalMap = L.map(mapId, { zoomControl: true });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(modalMap);
+    
+        const latlngs = coords.map(x => [x[0], x[1]]);
+    
+        if (latlngs.length >= 2) {
+          const line = L.polyline(latlngs, { color: '#ea5f94', weight: 7, opacity: 1.0 }).addTo(modalMap);
+    
+          L.marker(latlngs[0], { icon: L.icon({
+            iconUrl:'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+            shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize:[25,41], iconAnchor:[12,41], shadowSize:[41,41]
+          })}).addTo(modalMap).bindPopup('Start');
+    
+          L.marker(latlngs[latlngs.length - 1], { icon: L.icon({
+            iconUrl:'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+            shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize:[25,41], iconAnchor:[12,41], shadowSize:[41,41]
+          })}).addTo(modalMap).bindPopup('End');
+    
+          modalMap.fitBounds(line.getBounds(), { padding: [40, 40], maxZoom: 17 });
+        } else if (latlngs.length === 1) {
+          modalMap.setView(latlngs[0], 15);
+          L.marker(latlngs[0]).addTo(modalMap).bindPopup('Point');
+        } else {
+          document.getElementById(mapId).innerHTML =
+            '<div style="color:#eb9aac;padding:2em;text-align:center;">No points found for this route.</div>';
+        }
+    
+        // 🔑 Fix grey/blank tiles in modals
+        setTimeout(() => modalMap.invalidateSize(true), 150);
+      }, 100);
+    }
 
+    async function loadTodoRoutes(filters = {}) {
+      let url = 'api/routes/todo.php';
+      const qs = new URLSearchParams();
+    
+      for (const [k, v] of Object.entries(filters || {})) {
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          qs.set(k, v);
+        }
+      }
+    
+      const q = qs.toString();
+      if (q) url += '?' + q;
+    
+      console.log('[todo] fetching:', url);
+    
+      const resp = await fetch(url, { credentials: 'same-origin' });
+      const raw = await resp.text();
+    
+      let data;
+      try { data = JSON.parse(raw); }
+      catch {
+        console.error('[todo] non-json:', raw);
+        throw new Error('todo.php did not return JSON');
+      }
+    
+      const list = document.getElementById('trailsList');
+      if (!data.success || !data.routes) {
+        list.innerHTML = '<div class="no-routes">Failed to load To-Do routes.</div>';
+        return;
+      }
+    
+      renderRoutes(list, data.routes);
+    }
+    
+
+async function loadPublicRoutes(filters = {}) {
+    let url = 'api/routes/public.php';
+    let search = [];
+    if (filters) {
+        for (let key in filters) {
+            if (filters[key]) search.push(`${encodeURIComponent(key)}=${encodeURIComponent(filters[key])}`);
+        }
+    }
+    if (search.length) url += '?' + search.join('&');
+    const resp = await fetch(url);
+    const raw = await resp.text();
+
+    let data;
+    try {
+    data = JSON.parse(raw);
+    } catch (e) {
+    console.error("public.php returned non-JSON:", raw);
+    throw new Error("public.php did not return JSON (check console for raw response).");
+    }
+    const list = document.getElementById('trailsList');
+    if (!data.success || !data.routes) {
+        list.innerHTML = '<div class="no-routes">Failed to load public routes.</div>';
+        return;
+    }
+    renderRoutes(list, data.routes);
+}
+
+// Favourites (already loaded elsewhere if needed)
+async function loadFavourites(filters = {}) {
+    let url = 'api/routes/favourites.php';
+    const search = [];
+  
+    for (const key in filters) {
+      const v = filters[key];
+      if (v !== undefined && v !== null && String(v).trim() !== '') {
+        search.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
+      }
+    }
+    if (search.length) url += '?' + search.join('&');
+  
+    const resp = await fetch(url);
+    const raw = await resp.text();
+
+    let data;
+    try {
+    data = JSON.parse(raw);
+    } catch (e) {
+    console.error("favourites.php returned non-JSON:", raw);
+    throw new Error("favourites.php did not return JSON (check console for raw response).");
+    }
+
+    const list = document.getElementById('trailsList');
+  
+    if (!data.success || !data.routes) {
+      list.innerHTML = '<div class="no-routes">Failed to load favourites.</div>';
+      return;
+    }
+    renderRoutes(list, data.routes);
+}
+
+// ✅ make toast callable from anywhere (global)
+window.showAchievementToast = function(ach){
+    if (!ach) return;
+  
+    let wrap = document.querySelector('.toast-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'toast-wrap';
+      document.body.appendChild(wrap);
+    }
+  
+    const escapeHtml = (str) =>
+      String(str).replace(/[&<>"']/g, s => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+      }[s]));
+  
+    const toast = document.createElement('div');
+    toast.className = 'ach-toast';
+  
+    const earnedText = ach.earned_at ? `Earned: ${ach.earned_at}` : 'Achievement unlocked!';
+    const ptsText = (ach.points != null) ? `${ach.points} pts` : '';
+  
+    toast.innerHTML = `
+      <div class="row">
+        <div class="icon">${ach.icon || '🏅'}</div>
+        <div style="flex:1;">
+          <p class="title">Badge earned: ${escapeHtml(ach.title || 'Achievement')}</p>
+          <p class="desc">${escapeHtml(ach.description || '')}</p>
+        </div>
+      </div>
+      <div class="meta">
+        <span>${escapeHtml(earnedText)}</span>
+        <span>${escapeHtml(ptsText)}</span>
+      </div>
+      <div class="actions">
+        <button class="btn-close" type="button">Close</button>
+        <button class="btn-view" type="button">View</button>
+      </div>
+    `;
+  
+    toast.querySelector('.btn-close').onclick = () => toast.remove();
+    toast.querySelector('.btn-view').onclick = () => { window.location.href = 'achievements.php'; };
+  
+    wrap.appendChild(toast);
+  
+    setTimeout(() => { if (toast.isConnected) toast.remove(); }, 5500);
+  };
+
+  
+  window.toggleFavourite = async function(routeId, starEl){
+    try {
+      const res = await fetch('api/routes/favourite.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'route_id=' + encodeURIComponent(routeId)
+      });
+  
+      const data = await res.json();
+  
+      if (!data.success) {
+        alert(data.error || 'Favourite failed');
+        return;
+      }
+  
+      const added = data.action === 'added';
+  
+      starEl.textContent = added ? '★' : '☆';
+      starEl.style.opacity = added ? '1' : '0.35';
+  
+      if (data.achievement_unlocked) window.showAchievementToast(data.achievement_unlocked);
+  
+      // ✅ Only refresh lists where it matters
+      const activeTab = document.querySelector('.trails-tab.active')?.getAttribute('data-tab');
+      if (activeTab === 'public' || activeTab === 'favourites') {
+        refreshActiveTab();
+      }
+  
+    } catch (err) {
+      console.error(err);
+      alert('Favourite failed (see console).');
+    }
+  };
+  
+  
 // --- AJAX Login Handler (and Register Handler) ---
 document.addEventListener('DOMContentLoaded', function() {
     // Debug for script load
     console.log('main.js running!');
 
+    const initial = document.querySelector('.trails-tab.active')?.getAttribute('data-tab') || 'favourites';
+    setTrailsTab(initial);
+    refreshActiveTab(null);
     // --- Auth guard (redirect if not logged in) ---
     (function checkAuthGuard() {
         // Only run on pages that require auth (e.g. trails.php, generate.php)
@@ -755,6 +1261,10 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.success) {
                     isFavourited = data.action === 'added';
+                    let achievement = data.achievement_unlocked;
+                    if (achievement) {
+                        window.showAchievementToast(achievement);
+                    }
                     favIcon.textContent = isFavourited ? '★' : '☆';
                     favIcon.style.color = isFavourited ? '#ffc300' : '#ea5f94';
                     favBtn.classList.toggle('favourited', isFavourited);
@@ -811,280 +1321,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target === shareModal) shareModal.style.display = 'none';
         });
     }
-    // Trails page: tab switching (if present)
-    function renderRoutes(list, routes) {
-        list.innerHTML = '';
-      
-        if (!routes.length) {
-          list.innerHTML = '<div class="no-routes">No routes to show.</div>';
-          return;
-        }
-      
-        for (const route of routes) {
-          const div = document.createElement('div');
-          div.className = 'trails-route-card';
-          div.tabIndex = 0;
-      
-          const startName = route.start_name || "(missing name)";
-          const endName = route.end_name || "(missing name)";
-          const routeLabel = `${startName} → ${endName}`;
-          const minimapId = `minimap_${route.id}`;
-      
-          div.innerHTML = `
-            <div class="trails-route-map-mini">
-              <div id="${minimapId}" class="trails-route-map-mini-inner"></div>
-            </div>
-      
-            <div class="trails-route-names-overlay">
-              🌄 ${routeLabel}
-            </div>
-      
-            <div class="trails-route-stats-overlay">
-              <span>${Number(route.distance_km).toFixed(2)} km</span>
-              <span>⬆ ${route.elevation_gain_m} m</span>
-            </div>
-      
-            <span class="trails-fav-star"
-              onclick="event.stopPropagation();toggleFavourite(${route.id}, this)">
-              ★
-            </span>
-          `;
-      
-          div.onclick = () => openRouteMapModal(route.id, routeLabel, route);
-      
-          list.appendChild(div);
-      
-          setTimeout(() => initMiniRouteMap(minimapId, route.id), 50);
-        }
-      }
-      
 
-      function initMiniRouteMap(minimapId, routeId) {
-        fetch('api/routes/get_route_points.php?route_id=' + routeId)
-          .then(res => res.json())
-          .then(data => {
-            if (!data.success || !data.coordinates.length) return;
-      
-            const container = document.getElementById(minimapId);
-            if (!container) return;
-      
-            const map = L.map(minimapId, {
-              zoomControl: false,
-              attributionControl: false,
-              dragging: false,
-              scrollWheelZoom: false,
-              doubleClickZoom: false,
-              boxZoom: false,
-              keyboard: false,
-              tap: false,
-              touchZoom: false
-            });
-      
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              maxZoom: 17
-            }).addTo(map);
-      
-            const latlngs = data.coordinates.map(p => [p[0], p[1]]);
-      
-            const line = L.polyline(latlngs, {
-              color: '#ea5f94',
-              weight: 5,
-              opacity: 0.95
-            }).addTo(map);
-      
-            map.fitBounds(line.getBounds(), {
-              padding: [20, 20],
-              maxZoom: 16
-            });
-      
-            // 🔑 Critical
-            setTimeout(() => map.invalidateSize(true), 100);
-          });
-      }
-      
-// --- Map Modal for Viewing Public/Favourite Route ---
-function openRouteMapModal(route_id, routeTitle, routeMeta) {
-    let modal = document.getElementById('routeMapModal');
-  
-    // Helper: close modal + cleanup esc listener
-    const closeModal = () => {
-      if (!modal) return;
-      modal.style.display = 'none';
-      if (modal._escHandler) {
-        document.removeEventListener('keydown', modal._escHandler);
-        modal._escHandler = null;
-      }
-    };
-  
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'routeMapModal';
-      modal.style = 'position:fixed; top:0; left:0; width:100vw;height:100vh;background:rgba(24,13,39,0.98); z-index:2050; display:flex; align-items:center;justify-content:center;';
-  
-      modal.innerHTML = `
-        <div id="routeMapModalCard"
-             style="background:#2f1723;color:#f8eef7;min-width:300px;width:95vw; max-width:510px; min-height:350px;border-radius:18px;box-shadow:0 12px 56px #ea5f9470;position:relative;padding:2rem 2.25rem;display:flex;flex-direction:column;gap:1.1em;align-items:center;">
-          <button id="closeRouteMapModal"
-                  aria-label="Close"
-                  style="position:absolute; top:0.65em; right:1.1em; border:none; background:none;color:#ea5f94;font-size:2em;cursor:pointer;">&times;</button>
-          <div style="font-size:1.33em;font-weight:bold;margin-bottom:.4em;">${routeTitle || 'Route Map'}</div>
-          <div id="modalMapMeta"></div>
-          <div id="routeMapContainer"
-               style="width:100%;min-width:270px; height:320px; background:#242; border-radius:9px; box-shadow:0 2px 19px #ea5f9412;"></div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-  
-      // ✅ Close when clicking outside the card (overlay click)
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-      });
-  
-      // ✅ Close button
-      modal.querySelector('#closeRouteMapModal').addEventListener('click', closeModal);
-    } else {
-      modal.style.display = 'flex';
-      // Update title each time (since innerHTML isn't rebuilt)
-      const card = modal.querySelector('#routeMapModalCard');
-      if (card) {
-        const titleDiv = card.querySelector('div');
-        if (titleDiv) titleDiv.textContent = routeTitle || 'Route Map';
-      }
-    }
-  
-    // Render metadata if available
-    document.getElementById('modalMapMeta').innerHTML = routeMeta
-      ? `<span style='color:#ddc2e0;'>Created: ${routeMeta.created_at && routeMeta.created_at.split(' ')[0]}</span><br><span style='color:#bbdaae;'>${routeMeta.description || ''}</span>`
-      : '';
-  
-    // ✅ Close on ESC
-    modal._escHandler = (ev) => {
-      if (ev.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', modal._escHandler);
-  
-    // Fetch and show the map
-    fetch('api/routes/get_route_points.php?route_id=' + route_id)
-      .then(res => res.json())
-      .then(data => {
-        if (!data.success || !data.coordinates.length) {
-          document.getElementById('routeMapContainer').innerHTML =
-            '<div style="color:#eb9aac;padding:2em;text-align:center;">No points found for this route.</div>';
-          return;
-        }
-        setTimeout(() => showModalMap('routeMapContainer', data.coordinates), 120);
-      });
-  }
   
 
-  function showModalMap(containerId, coords) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-  
-    // Create an inner div ONLY inside the container
-    const mapId = "modalMap_" + Math.floor(Math.random() * 1e8);
-    container.innerHTML = `<div id="${mapId}" style="background:#222246;width:100%;height:320px;border-radius:9px;box-shadow:0 2px 19px #ea5f9412;"></div>`;
-  
-    setTimeout(() => {
-      const modalMap = L.map(mapId, { zoomControl: true });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19
-      }).addTo(modalMap);
-  
-      const latlngs = coords.map(x => [x[0], x[1]]);
-  
-      if (latlngs.length >= 2) {
-        const line = L.polyline(latlngs, { color: '#ea5f94', weight: 7, opacity: 1.0 }).addTo(modalMap);
-  
-        L.marker(latlngs[0], { icon: L.icon({
-          iconUrl:'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
-          shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-          iconSize:[25,41], iconAnchor:[12,41], shadowSize:[41,41]
-        })}).addTo(modalMap).bindPopup('Start');
-  
-        L.marker(latlngs[latlngs.length - 1], { icon: L.icon({
-          iconUrl:'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-          shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-          iconSize:[25,41], iconAnchor:[12,41], shadowSize:[41,41]
-        })}).addTo(modalMap).bindPopup('End');
-  
-        modalMap.fitBounds(line.getBounds(), { padding: [40, 40], maxZoom: 17 });
-      } else if (latlngs.length === 1) {
-        modalMap.setView(latlngs[0], 15);
-        L.marker(latlngs[0]).addTo(modalMap).bindPopup('Point');
-      } else {
-        document.getElementById(mapId).innerHTML =
-          '<div style="color:#eb9aac;padding:2em;text-align:center;">No points found for this route.</div>';
-      }
-  
-      // 🔑 Fix grey/blank tiles in modals
-      setTimeout(() => modalMap.invalidateSize(true), 150);
-    }, 100);
-  }
-  
-
-
-    
-    async function loadPublicRoutes(filters = {}) {
-        let url = 'api/routes/public.php';
-        let search = [];
-        if (filters) {
-            for (let key in filters) {
-                if (filters[key]) search.push(`${encodeURIComponent(key)}=${encodeURIComponent(filters[key])}`);
-            }
-        }
-        if (search.length) url += '?' + search.join('&');
-        const resp = await fetch(url);
-        const raw = await resp.text();
-
-        let data;
-        try {
-        data = JSON.parse(raw);
-        } catch (e) {
-        console.error("public.php returned non-JSON:", raw);
-        throw new Error("public.php did not return JSON (check console for raw response).");
-        }
-        const list = document.getElementById('trailsList');
-        if (!data.success || !data.routes) {
-            list.innerHTML = '<div class="no-routes">Failed to load public routes.</div>';
-            return;
-        }
-        renderRoutes(list, data.routes);
-    }
-
-    // Favourites (already loaded elsewhere if needed)
-    async function loadFavourites(filters = {}) {
-        let url = 'api/routes/favourites.php';
-        const search = [];
-      
-        for (const key in filters) {
-          const v = filters[key];
-          if (v !== undefined && v !== null && String(v).trim() !== '') {
-            search.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
-          }
-        }
-        if (search.length) url += '?' + search.join('&');
-      
-        const resp = await fetch(url);
-        const raw = await resp.text();
-
-        let data;
-        try {
-        data = JSON.parse(raw);
-        } catch (e) {
-        console.error("favourites.php returned non-JSON:", raw);
-        throw new Error("favourites.php did not return JSON (check console for raw response).");
-        }
-
-        const list = document.getElementById('trailsList');
-      
-        if (!data.success || !data.routes) {
-          list.innerHTML = '<div class="no-routes">Failed to load favourites.</div>';
-          return;
-        }
-        renderRoutes(list, data.routes);
-      }
       
     // Tab switching logic
     document.querySelectorAll('.trails-tab').forEach(tab => {
@@ -1094,6 +1333,8 @@ function openRouteMapModal(route_id, routeTitle, routeMeta) {
             const which = tab.getAttribute('data-tab');
             if (which === 'public') {
                 loadPublicRoutes();
+            } else if (which === 'todo') {
+                loadTodoRoutes();
             } else {
                 loadFavourites();
             }
@@ -1107,78 +1348,19 @@ function openRouteMapModal(route_id, routeTitle, routeMeta) {
     }
     // Filters
     document.getElementById('applyFilters')?.addEventListener('click', function() {
-        const minDistance = document.getElementById('minDistance').value;
-        const maxDistance = document.getElementById('maxDistance').value;
-        const minElevation = document.getElementById('minElevation').value;
-        const maxElevation = document.getElementById('maxElevation').value;
-        const pavement = document.getElementById('pavementType').value;
-      
-        const filters = {
-          distance_min: minDistance,
-          distance_max: maxDistance,
-          elev_min: minElevation,
-          elev_max: maxElevation,
-          pavement_type: pavement
-        };
-      
-        const activeTab = document.querySelector('.trails-tab.active')?.getAttribute('data-tab');
-      
-        if (activeTab === 'public') {
-          loadPublicRoutes(filters);
-        } else {
-          loadFavourites(filters);  // ✅ filter favourites too
-        }
-      });
+      const filters = {
+        distance_min: document.getElementById('minDistance')?.value || '',
+        distance_max: document.getElementById('maxDistance')?.value || '',
+        elev_min: document.getElementById('minElevation')?.value || '',
+        elev_max: document.getElementById('maxElevation')?.value || '',
+        pavement_type: document.getElementById('pavementType')?.value || ''
+      };
+    
+      refreshActiveTab(filters);
+    });
+    
+    
 
-        // ===============================
-        // Auto-refresh when filters cleared
-        // ===============================
-
-        let filtersDebounceTimer = null;
-
-        function getFilters() {
-        return {
-            distance_min: document.getElementById('minDistance')?.value ?? '',
-            distance_max: document.getElementById('maxDistance')?.value ?? '',
-            elev_min: document.getElementById('minElevation')?.value ?? '',
-            elev_max: document.getElementById('maxElevation')?.value ?? '',
-            pavement_type: document.getElementById('pavementType')?.value ?? ''
-        };
-        }
-
-        function areFiltersEmpty(filters) {
-        return !String(filters.distance_min).trim()
-            && !String(filters.distance_max).trim()
-            && !String(filters.elev_min).trim()
-            && !String(filters.elev_max).trim()
-            && !String(filters.pavement_type).trim();
-        }
-
-        function refreshActiveTab(filters = null) {
-        const activeTab = document.querySelector('.trails-tab.active')?.getAttribute('data-tab');
-        if (activeTab === 'public') {
-            filters ? loadPublicRoutes(filters) : loadPublicRoutes();
-        } else {
-            filters ? loadFavourites(filters) : loadFavourites();
-        }
-        }
-
-        function onFiltersChanged() {
-        const filters = getFilters();
-
-        // ✅ If all filters cleared → auto reload
-        if (areFiltersEmpty(filters)) {
-            clearTimeout(filtersDebounceTimer);
-            refreshActiveTab(null);
-            return;
-        }
-
-        // (optional debounce for live filtering – currently disabled)
-        clearTimeout(filtersDebounceTimer);
-        filtersDebounceTimer = setTimeout(() => {
-            // refreshActiveTab(filters);
-        }, 300);
-        }
 
         // Attach listeners
         ['minDistance','maxDistance','minElevation','maxElevation','pavementType'].forEach(id => {
@@ -1187,75 +1369,158 @@ function openRouteMapModal(route_id, routeTitle, routeMeta) {
         el.addEventListener('input', onFiltersChanged);
         el.addEventListener('change', onFiltersChanged);
         });
-
-
-        // ===============================
-        // ACHIEVEMENTS PAGE MODAL (main.js)
-        // ===============================
-        (function initAchievementsPage(){
-            document.addEventListener('DOMContentLoaded', () => {
-            const modal = document.getElementById('achModal');
-            if (!modal) return; // not on achievements page
-        
-            const closeBtn = document.getElementById('achModalClose');
-        
-            function openAchModal(card){
-                const title = card.dataset.title || 'Achievement';
-                const desc  = card.dataset.desc  || '';
-                const icon  = card.dataset.icon  || '🏅';
-                const earned = card.dataset.earned === '1';
-                const earnedDate = card.dataset.earnedDate || '';
-                const points = card.dataset.points || '0';
-        
-                const titleEl = document.getElementById('achModalTitle');
-                const descEl  = document.getElementById('achModalDesc');
-                const iconEl  = document.getElementById('achModalIcon');
-                const subEl   = document.getElementById('achModalSub');
-                const statusEl= document.getElementById('achModalStatus');
-                const ptsEl   = document.getElementById('achModalPoints');
-        
-                if (titleEl) titleEl.textContent = title;
-                if (descEl)  descEl.textContent = desc;
-                if (iconEl)  iconEl.textContent = icon;
-        
-                if (subEl) {
-                subEl.textContent = earned
-                    ? (earnedDate ? `Earned on ${earnedDate}` : 'Earned')
-                    : 'Not earned yet';
-                }
-        
-                if (statusEl) statusEl.textContent = 'Status: ' + (earned ? 'Earned ✅' : 'Locked 🔒');
-                if (ptsEl) ptsEl.textContent = 'Points: ' + points;
-        
-                modal.style.display = 'flex';
-                modal.setAttribute('aria-hidden', 'false');
-            }
-        
-            function closeAchModal(){
-                modal.style.display = 'none';
-                modal.setAttribute('aria-hidden', 'true');
-            }
-        
-            document.querySelectorAll('.ach-card').forEach(card => {
-                card.addEventListener('click', () => openAchModal(card));
-                card.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    openAchModal(card);
-                }
-                });
-            });
-        
-            closeBtn?.addEventListener('click', closeAchModal);
-            modal.addEventListener('click', (e) => { if (e.target === modal) closeAchModal(); });
-            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAchModal(); });
-            });
-        })();
-        
-
       
 });
-document.getElementById('nav-login-btn')?.addEventListener('click', function(e){
-    e.preventDefault();
-    document.getElementById('loginModal').style.display = 'flex';
-});
+// ===============================
+// ACHIEVEMENTS PAGE MODAL (main.js)
+// ===============================
+// ---------- functions ----------
+
+function initAchievementsPage() {
+    const modal = document.getElementById('achModal');
+    if (!modal) return;
+  
+    const closeBtn = document.getElementById('achModalClose');
+  
+    function openAchModal(card) {
+  
+        const title = card.dataset.title || 'Achievement'; 
+        const desc = card.dataset.desc || ''; 
+        const icon = card.dataset.icon || '🏅'; 
+        const earned = card.dataset.earned === '1'; 
+        const earnedDate = card.dataset.earnedDate || ''; 
+        const points = card.dataset.points || '0'; 
+        const titleEl = document.getElementById('achModalTitle'); 
+        const descEl = document.getElementById('achModalDesc'); 
+        const iconEl = document.getElementById('achModalIcon'); 
+        const subEl = document.getElementById('achModalSub'); 
+        const statusEl= document.getElementById('achModalStatus'); 
+        const ptsEl = document.getElementById('achModalPoints'); 
+        if (titleEl) titleEl.textContent = title; 
+        if (descEl) descEl.textContent = desc; 
+        if (iconEl) iconEl.textContent = icon; 
+        if (subEl) { 
+            subEl.textContent = earned 
+            ? (earnedDate ? `Earned on ${earnedDate}` : 'Earned')
+            : 'Not earned yet'; 
+        } 
+        if (statusEl) statusEl.textContent = 'Status: ' + (earned ? 'Earned ✅' : 'Locked 🔒'); 
+        if (ptsEl) ptsEl.textContent = 'Points: ' + points; 
+        modal.style.display = 'flex'; 
+        modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeAchModal() {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+  
+    document.querySelectorAll('.ach-card').forEach(card => {
+        card.addEventListener('click', () => openAchModal(card));
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openAchModal(card);
+          }
+        });
+    });
+  
+    closeBtn?.addEventListener('click', closeAchModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeAchModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAchModal(); });
+  }
+  
+  function attachTrailsSaveHandler() {
+    const trailsList = document.getElementById('trailsList');
+    if (!trailsList) {
+      console.warn('[save-pin] trailsList not found');
+      return;
+    }
+  
+    if (trailsList._saveHandlerAttached) return;
+    trailsList._saveHandlerAttached = true;
+  
+    console.log('[save-pin] handler attached');
+  
+    trailsList.addEventListener('click', async (e) => {
+      const pin = e.target.closest('.trails-save-pin');
+      if (!pin) return;
+  
+      console.log('[save-pin] clicked', pin.getAttribute('data-route-id'));
+  
+      e.preventDefault();
+      e.stopPropagation();
+  
+      const routeId = pin.getAttribute('data-route-id');
+      if (!routeId) return;
+  
+      const res = await fetch('api/routes/save_later.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'route_id=' + encodeURIComponent(routeId)
+      });
+  
+      const raw = await res.text();
+      console.log('[save-pin] response raw:', raw);
+  
+      let data;
+      try { data = JSON.parse(raw); }
+      catch { alert('save_later.php returned non-JSON'); return; }
+  
+      if (!data.success) { alert(data.error || 'Save failed'); return; }
+  
+      const added = data.action === 'added';
+      pin.textContent = added ? '📌' : '📍';
+      pin.style.opacity = added ? '1' : '0.35';
+  
+      if (data.achievement_unlocked) window.showAchievementToast(data.achievement_unlocked);
+    }, true);
+  }
+  
+  
+  
+  function attachTrailsStarHandler() {
+    const trailsList = document.getElementById('trailsList');
+    if (!trailsList) return;
+  
+    // ✅ robust one-time guard (property on the element)
+    if (trailsList._favHandlerAttached) return;
+    trailsList._favHandlerAttached = true;
+  
+    trailsList.addEventListener('click', (e) => {
+      const star = e.target.closest('.trails-fav-star');
+      if (!star) return;
+  
+      e.preventDefault();
+      e.stopPropagation();
+  
+      const routeId = star.getAttribute('data-route-id');
+      if (!routeId) return;
+  
+      window.toggleFavourite(routeId, star);
+    }, true);
+  }
+  
+  
+  
+  // ---------- one DOMContentLoaded ----------
+  document.addEventListener('DOMContentLoaded', () => {
+    // attach filter listeners here (so the elements exist)
+    ['minDistance','maxDistance','minElevation','maxElevation','pavementType'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', onFiltersChanged);
+      el.addEventListener('change', onFiltersChanged);
+    });
+  
+    attachTrailsStarHandler();
+    attachTrailsSaveHandler();
+    initAchievementsPage();
+  
+    document.getElementById('nav-login-btn')?.addEventListener('click', function(e){
+      e.preventDefault();
+      document.getElementById('loginModal').style.display = 'flex';
+    });
+  });
+  
