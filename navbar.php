@@ -18,12 +18,13 @@ $is_logged_in = !!$user;
       <li><a href="trails.php" class="<?= $current_page=='trails.php' ? 'highlighted-nav' : '' ?>">Trails</a></li>
       <li><a href="generate.php" class="<?= $current_page=='generate.php' ? 'highlighted-nav' : '' ?>">Generate Route</a></li>
       <?php if ($is_logged_in): ?>
+        <li><a href="leaderboard.php" class="<?= $current_page=='leaderboard.php' ? 'highlighted-nav' : '' ?>">Leaderboard</a></li>
         <li><a href="achievements.php" class="<?= $current_page=='achievements.php' ? 'highlighted-nav' : '' ?>">Achievements</a></li>
         <li><a href="profile.php" class="<?= $current_page=='profile.php' ? 'highlighted-nav' : '' ?>">Profile</a></li>
-        <li><a href="logout.php">Logout</a></li>
+        <li><a href="logout.php" class="<?= $current_page=='logout.php' ? 'highlighted-nav' : '' ?>">Logout</a></li>
       <?php else: ?>
-        <li><a href="#" id="nav-login-btn">Log In</a></li>
+        <li><a href="#" id="nav-login-btn" class="<?= $current_page=='login.php' ? 'highlighted-nav' : '' ?>">Log In</a></li>
       <?php endif; ?>
     </ul>
-  </nav>
+  </nav>  
 </header>

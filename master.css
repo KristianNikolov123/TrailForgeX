@@ -463,6 +463,47 @@ footer {
     background: #ea5f94;
     color: #fff;
 }
+
+.trails-done-btn{
+  position:absolute;
+  right:14px;
+  bottom:14px;
+  width:36px;
+  height:36px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  border-radius:12px;
+  background: rgba(101,230,140,0.12);
+  border: 1px solid rgba(101,230,140,0.35);
+  color:#65e68c;
+  font-size:18px;
+  cursor:pointer;
+  user-select:none;
+  transition: transform .12s ease, background .12s ease;
+}
+
+.trails-done-btn:hover{
+  transform: translateY(-1px);
+  background: rgba(101,230,140,0.18);
+}
+
+.trails-route-card { position: relative; }
+
+.trails-done-btn,
+.trails-fav-star,
+.trails-save-pin {
+  position: absolute;
+  z-index: 30; /* must be above overlays */
+}
+
+.trails-route-names-overlay,
+.trails-route-stats-overlay {
+  z-index: 10;
+  pointer-events: none; /* overlays won’t block clicks */
+}
+
 .modal {
     display: none;
     align-items: center;
@@ -1020,6 +1061,7 @@ footer {
     transition: transform .12s ease, box-shadow .12s ease, border .12s ease;
     position: relative;
     overflow:hidden;
+    padding-top: 2.6em;
   }
   
   .ach-card:hover{
@@ -1038,6 +1080,7 @@ footer {
     align-items: center;
     justify-content: space-between;
     gap: .8em;
+    margin-top: 0.25rem;
   }
   
   .ach-icon{
@@ -1060,7 +1103,16 @@ footer {
     font-weight: 900;
     font-size: 1.05rem;
     margin: 0;
-    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    line-height: 1.25;
+    max-height: 2.5em;
   }
   
   .ach-desc{
@@ -1083,12 +1135,13 @@ footer {
     right: .85em;
     background: rgba(0,0,0,0.35);
     border: 1px solid rgba(255,255,255,0.12);
-    padding: .35em .6em;
+    padding: .28em .6em;
     border-radius: 999px;
     color:#ffdff7;
+    font-size: .72rem;
     font-weight: 900;
-    font-size: .84rem;
-    letter-spacing: .3px;
+    letter-spacing: .02em;
+    z-index: 2;
   }
   
   .ach-badge.earned{
@@ -1380,3 +1433,459 @@ footer {
     border: 1px solid rgba(255,255,255,0.12);
   }
   
+
+  /* ===============================
+   Achievements: Featured picker
+=============================== */
+
+.ach-featured-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:1.25rem;
+  margin:1rem 0 1rem 0;
+  padding:1rem 1.1rem;
+  border-radius:14px;
+  background:rgba(234,95,148,0.08);
+  border:1px solid rgba(234,95,148,0.22);
+}
+
+.ach-featured-left{
+  display:flex;
+  flex-direction:column;
+  gap:.25rem;
+}
+
+.ach-featured-title{
+  color:#fff;
+  font-weight:900;
+  font-size:1.05rem;
+}
+
+.ach-featured-sub{
+  color:#d9a7c8;
+  font-weight:700;
+  font-size:.92rem;
+  line-height:1.35;
+}
+
+.ach-featured-right{
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+}
+
+.ach-featured-count{
+  color:#e6bfd6;
+  font-weight:900;
+}
+
+.ach-featured-save{
+  background:#ea5f94;
+  color:#fff;
+  border:none;
+  padding:.55em 1.1em;
+  border-radius:10px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.ach-featured-save:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+
+.ach-featured-msg{
+  display:none;
+  margin:0 0 1rem 0;
+  font-weight:800;
+}
+
+/* Checkbox overlay inside cards */
+.ach-card{
+  position:relative; /* required for overlay */
+}
+
+/* ===============================
+   Achievements: Feature badge toggle
+=============================== */
+
+.ach-feature-toggle {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+
+  padding: .35rem .65rem;
+  border-radius: 999px;
+
+  background: rgba(20, 14, 22, 0.75);
+  backdrop-filter: blur(4px);
+
+  color: #e6bfd6;
+  font-weight: 800;
+  font-size: .78rem;
+
+  cursor: pointer;
+  user-select: none;
+
+  border: 1px solid rgba(234, 95, 148, 0.35);
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.ach-feature-toggle:hover {
+  background: rgba(234, 95, 148, 0.18);
+  border-color: #ea5f94;
+  color: #fff;
+}
+
+.ach-feature-toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+
+  border: 2px solid #cbb1cd;
+  background: transparent;
+
+  display: inline-grid;
+  place-content: center;
+
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.ach-feature-toggle input::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  transform: scale(0);
+  transition: transform .12s ease;
+  background: #ea5f94;
+}
+
+.ach-feature-toggle input:checked {
+  border-color: #ea5f94;
+  background: rgba(234, 95, 148, 0.15);
+}
+
+.ach-feature-toggle input:checked::before {
+  transform: scale(1);
+}
+
+.ach-feature-toggle span {
+  line-height: 1;
+}
+
+/* Modal desc class (used in new achievements.php) */
+.ach-modal-desc{
+  color:#e6bfd6;
+  font-weight:700;
+  line-height:1.45;
+}
+
+/* Progress bar (if you didn't have it) */
+.ach-progress{
+  margin-top:.85rem;
+}
+
+.ach-progress-bar{
+  height:10px;
+  border-radius:99px;
+  background:rgba(255,255,255,0.08);
+  overflow:hidden;
+}
+
+.ach-progress-fill{
+  height:100%;
+  border-radius:99px;
+  background:#ea5f94;
+}
+
+.ach-progress-text{
+  margin-top:.35rem;
+  color:#d9a7c8;
+  font-weight:900;
+  font-size:.9rem;
+}
+
+
+/* ===============================
+   Leaderboard
+=============================== */
+
+.lb-main{
+  max-width: 980px;
+  margin: 2em auto 3em auto;
+  padding: 0 1rem;
+}
+
+.lb-hero h2{
+  color:#ea5f94;
+  margin: 0 0 .35rem 0;
+}
+
+.lb-hero p{
+  color:#d9a7c8;
+  margin: 0 0 1.25rem 0;
+  font-weight: 700;
+}
+
+/* Search */
+.lb-search{
+  margin-bottom: 1.2rem;
+}
+
+.lb-search-form{
+  display:flex;
+  align-items:center;
+  gap:.6rem;
+  flex-wrap:wrap;
+
+  background:#241b24;
+  border-radius: 14px;
+  padding: .85rem .95rem;
+
+  border: 1px solid rgba(234,95,148,0.16);
+  box-shadow: 0 3px 39px #ea5f9418;
+}
+
+.lb-search-input{
+  flex: 1;
+  min-width: 220px;
+
+  border:none;
+  outline:none;
+
+  background:#2b1d29;
+  color:#fff;
+  padding:.65rem .85rem;
+  border-radius: 12px;
+
+  border: 1px solid rgba(255,255,255,0.06);
+  font-weight: 800;
+}
+
+.lb-search-btn{
+  background:#ea5f94;
+  color:#fff;
+  border:none;
+  padding:.65rem 1rem;
+  border-radius: 12px;
+  font-weight: 900;
+  cursor:pointer;
+}
+
+.lb-search-clear{
+  color:#e6bfd6;
+  font-weight: 900;
+  text-decoration:none;
+  padding:.65rem .85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+}
+
+.lb-search-results{
+  margin-top: .9rem;
+  padding: 1rem 1rem;
+
+  background: rgba(234,95,148,0.06);
+  border: 1px solid rgba(234,95,148,0.18);
+  border-radius: 14px;
+}
+
+.lb-search-title{
+  color:#fff;
+  font-weight: 900;
+  margin-bottom: .7rem;
+}
+
+/* Grid cards */
+.lb-grid{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: 1.2rem;
+}
+
+@media (min-width: 980px){
+  .lb-grid{
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.lb-card{
+  background:#241b24;
+  border-radius: 16px;
+  padding: 1.2rem 1.25rem;
+  box-shadow: 0 3px 39px #ea5f9430;
+  border: 1px solid rgba(234,95,148,0.16);
+}
+
+.lb-card-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap: 1rem;
+  margin-bottom: .85rem;
+}
+
+.lb-card-head h3{
+  color:#fff;
+  margin:0;
+  font-size: 1.1rem;
+}
+
+.lb-sub{
+  color:#cbb1cd;
+  font-weight: 900;
+  font-size: .9rem;
+}
+
+.lb-empty{
+  color:#cbb1cd;
+  font-weight: 900;
+  padding: .75rem 0;
+}
+
+.lb-list{
+  display:flex;
+  flex-direction:column;
+  gap: .55rem;
+}
+
+.lb-row{
+  display:grid;
+  grid-template-columns: 56px 42px 1fr auto;
+  align-items:center;
+  gap: .75rem;
+
+  padding: .6rem .7rem;
+  border-radius: 12px;
+
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.lb-row.me{
+  background: rgba(234,95,148,0.08);
+  border-color: rgba(234,95,148,0.22);
+}
+
+.lb-rank{
+  color:#e6bfd6;
+  font-weight: 900;
+}
+
+.lb-avatar{
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  background:#332033;
+  border: 1px solid rgba(234,95,148,0.35);
+}
+
+.lb-name{
+  color:#fff;
+  font-weight: 900;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-me-tag{
+  margin-left: .5rem;
+  font-size: .75rem;
+  font-weight: 900;
+  color:#ea5f94;
+  background: rgba(234,95,148,0.14);
+  border: 1px solid rgba(234,95,148,0.25);
+  padding: .15rem .45rem;
+  border-radius: 999px;
+}
+
+.lb-points{
+  color:#e6bfd6;
+  font-weight: 900;
+  display:flex;
+  gap:.45rem;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.lb-points-pill{
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: .25rem .5rem;
+  border-radius: 999px;
+  color:#e6bfd6;
+  font-weight: 900;
+  font-size: .85rem;
+}
+
+.lb-divider{
+  margin: .65rem 0 .35rem 0;
+  padding: .35rem .2rem;
+  color:#d9a7c8;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: .78rem;
+  opacity: .95;
+}
+.lb-row{
+  text-decoration: none;
+  color: inherit;
+}
+
+.lb-row:hover{
+  border-color: rgba(234,95,148,0.35);
+  background: rgba(234,95,148,0.10);
+  transform: translateY(-1px);
+  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+}
+
+.lb-row:active{
+  transform: translateY(0);
+}
+
+.lb-hero-small h2{
+  margin-top: 1.6rem;
+}
+
+
+.lb-tabs{
+  display:flex;
+  gap:.7rem;
+  margin: .25rem 0 1rem 0;
+}
+
+.lb-tab{
+  display:inline-flex;
+  align-items:center;
+  gap:.45rem;
+  padding:.55rem .95rem;
+  border-radius: 999px;
+
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color:#e6bfd6;
+  font-weight: 900;
+  text-decoration:none;
+}
+
+.lb-tab:hover{
+  border-color: rgba(234,95,148,0.35);
+  background: rgba(234,95,148,0.10);
+}
+
+.lb-tab.active{
+  background: rgba(234,95,148,0.16);
+  border-color: rgba(234,95,148,0.35);
+  color:#fff;
+}

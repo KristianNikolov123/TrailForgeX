@@ -3,6 +3,7 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 session_start();
+require_once __DIR__ . '/../achievements/award_by_metric.php';
 header('Content-Type: application/json');
 
 // Accept JSON or form POST
@@ -41,5 +42,14 @@ if (!$already_shared) {
     $ins->execute();
     $ins->close();
 }
+
+$unlockedList = tf_award_by_metric($connection, $user_id, 'share_count');
+
 mysqli_close($connection);
-echo json_encode(['success' => true, 'action' => 'shared']);
+echo json_encode([
+  'success' => true,
+  'action' => 'shared',
+  'achievement_unlocked' => $unlockedList ? $unlockedList[0] : null,
+  'achievements_unlocked' => $unlockedList
+]);
+

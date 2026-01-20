@@ -7,12 +7,17 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once 'dbconn.php';
-$user_id = $_SESSION['user_id'];
+$viewer_id = (int)$_SESSION['user_id'];
+$user_id = $viewer_id;
+
+if (isset($_GET['user']) && ctype_digit($_GET['user'])) {
+  $user_id = (int)$_GET['user'];
+}
 
 /* =========================
    HANDLE PROFILE UPDATE
 ========================= */
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id === $viewer_id) {
 
     $updates = [];
     $params  = [];
@@ -266,28 +271,29 @@ include 'navbar.php';
 
 
     <hr style="margin:2em 0 1.1em 0;border-color:#512545;">
+    <?php if ($user_id === $viewer_id): ?>
+        <form method="post" enctype="multipart/form-data">
+            <label style="color:#ea5f94;">Edit Bio</label>
+            <textarea
+                name="bio"
+                rows="3"
+                style="width:100%;margin-bottom:1em;
+                    resize:vertical;padding:.7em;
+                    border-radius:7px;background:#2b1d29;
+                    color:#fff;"
+            ><?= htmlspecialchars($bio) ?></textarea>
 
-    <form method="post" enctype="multipart/form-data">
-        <label style="color:#ea5f94;">Edit Bio</label>
-        <textarea
-            name="bio"
-            rows="3"
-            style="width:100%;margin-bottom:1em;
-                   resize:vertical;padding:.7em;
-                   border-radius:7px;background:#2b1d29;
-                   color:#fff;"
-        ><?= htmlspecialchars($bio) ?></textarea>
+            <label style="color:#ea5f94;">Profile image</label>
+            <input type="file" name="profile_image" accept="image/*" style="margin-bottom:1em;">
 
-        <label style="color:#ea5f94;">Profile image</label>
-        <input type="file" name="profile_image" accept="image/*" style="margin-bottom:1em;">
-
-        <button type="submit"
-                style="padding:.54em 2.3em;
-                       background:#ea5f94;color:#fff;
-                       font-weight:bold;border-radius:7px;border:none;">
-            Save Changes
-        </button>
-    </form>
+            <button type="submit"
+                    style="padding:.54em 2.3em;
+                        background:#ea5f94;color:#fff;
+                        font-weight:bold;border-radius:7px;border:none;">
+                Save Changes
+            </button>
+        </form>
+    <?php endif; ?>
 </main>
 
 </body>

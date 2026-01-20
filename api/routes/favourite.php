@@ -3,6 +3,8 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../achievements/award.php';
+require_once __DIR__ . '/../achievements/award_by_metric.php';
+
 
 // Must be logged in
 if (!isset($_SESSION['user_id'])) {
@@ -77,17 +79,19 @@ if ($already_fav) {
     $ins->close();
 
     $action = 'added';
-    $unlocked = null;
-
+    $unlockedList = [];
     if ($success && $action === 'added') {
-        $unlocked = awardAchievement($connection, $user_id, 'first_favourite');
+        $unlockedList = tf_award_by_metric($connection, $user_id, 'favourite_count');
     }
+
     
     echo json_encode([
         'success' => (bool)$success,
         'action' => $action,
-        'achievement_unlocked' => $unlocked // null or object
+        'achievement_unlocked' => $unlockedList ? $unlockedList[0] : null,
+        'achievements_unlocked' => $unlockedList
     ]);
+    
     
 }
 

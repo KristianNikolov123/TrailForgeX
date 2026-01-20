@@ -710,6 +710,9 @@ function initMiniRouteMap(minimapId, routeId) {
   
         const container = document.getElementById(minimapId);
         if (!container) return;
+
+        if (container.dataset.mapInit === "1") return;
+        container.dataset.mapInit = "1";
   
         const miniMap = L.map(minimapId, {
           zoomControl: false,
@@ -740,13 +743,18 @@ function initMiniRouteMap(minimapId, routeId) {
 
 // --- Route Card Rendering: renderRoutes (Global Scope) ---
 function renderRoutes(list, routes) {
+    if (!list) {
+      console.warn('[renderRoutes] list container is null/undefined; skipping render.');
+      return;
+    }
+
     list.innerHTML = '';
-  
-    if (!routes.length) {
+
+    if (!routes || !routes.length) {
       list.innerHTML = '<div class="no-routes">No routes to show.</div>';
       return;
     }
-  
+
     for (const route of routes) {
       const div = document.createElement('div');
       div.className = 'trails-route-card';
@@ -777,8 +785,8 @@ function renderRoutes(list, routes) {
       const routeLabel = `${startName} → ${endName}`      
       const minimapId = `minimap_${route.id}`;
       const isFav = route.is_favourited == 1;
-      const isSaved = String(route.is_saved || 0) === '1';
-  
+      const isSaved = Number(route.is_saved) === 1 || Number(route.is_todo) === 1;
+
       div.innerHTML = `
         <div class="trails-route-map-mini">
           <div id="${minimapId}" class="trails-route-map-mini-inner"></div>
@@ -793,6 +801,10 @@ function renderRoutes(list, routes) {
           <span>⬆ ${route.elevation_gain_m} m</span>
         </div>
   
+        ${isSaved ? `
+          <span class="trails-done-btn" data-route-id="${route.id}" tabindex="0" title="Mark as done">✅</span>
+        ` : ''}
+
         <span class="trails-fav-star" data-route-id="${route.id}" tabindex="0" style="opacity:${isFav ? 1 : 0.35};">
           ${isFav ? '★' : '☆'}
         </span>
@@ -802,9 +814,9 @@ function renderRoutes(list, routes) {
             ${isSaved ? '📌' : '📍'}
         </span>
       `;
-  
+      
       div.addEventListener('click', (e) => {
-        if (e.target.closest('.trails-fav-star') || e.target.closest('.trails-save-pin')) return;
+        if (e.target.closest('.trails-fav-star') || e.target.closest('.trails-save-pin') || e.target.closest('.trails-done-btn')) return;
         openRouteMapModal(route.id, routeLabel, route);
       });
       list.appendChild(div);
@@ -971,65 +983,160 @@ function renderRoutes(list, routes) {
     }
     
 
-async function loadPublicRoutes(filters = {}) {
-    let url = 'api/routes/public.php';
-    let search = [];
-    if (filters) {
-        for (let key in filters) {
-            if (filters[key]) search.push(`${encodeURIComponent(key)}=${encodeURIComponent(filters[key])}`);
+    async function loadPublicRoutes(filters = {}) {
+      let url = 'api/routes/public.php';
+      const search = [];
+    
+      for (const key in filters) {
+        const v = filters[key];
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          search.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
         }
-    }
-    if (search.length) url += '?' + search.join('&');
-    const resp = await fetch(url);
-    const raw = await resp.text();
-
-    let data;
-    try {
-    data = JSON.parse(raw);
-    } catch (e) {
-    console.error("public.php returned non-JSON:", raw);
-    throw new Error("public.php did not return JSON (check console for raw response).");
-    }
-    const list = document.getElementById('trailsList');
-    if (!data.success || !data.routes) {
+      }
+    
+      if (search.length) url += '?' + search.join('&');
+    
+      const resp = await fetch(url, { credentials: 'same-origin' });
+      const raw = await resp.text();
+    
+      let data;
+      try { data = JSON.parse(raw); }
+      catch (e) {
+        console.error("public.php returned non-JSON:", raw);
+        throw new Error("public.php did not return JSON.");
+      }
+    
+      const list = document.getElementById('trailsList');
+      if (!list) return;
+    
+      if (!data.success || !data.routes) {
         list.innerHTML = '<div class="no-routes">Failed to load public routes.</div>';
         return;
-    }
-    renderRoutes(list, data.routes);
-}
-
-// Favourites (already loaded elsewhere if needed)
-async function loadFavourites(filters = {}) {
-    let url = 'api/routes/favourites.php';
-    const search = [];
-  
-    for (const key in filters) {
-      const v = filters[key];
-      if (v !== undefined && v !== null && String(v).trim() !== '') {
-        search.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
       }
-    }
-    if (search.length) url += '?' + search.join('&');
-  
-    const resp = await fetch(url);
-    const raw = await resp.text();
+    
+      renderRoutes(list, data.routes);
+    }    
 
-    let data;
-    try {
+async function loadFavourites(filters = {}) {
+  let url = 'api/routes/favourites.php';
+  const search = [];
+
+  for (const key in filters) {
+    const v = filters[key];
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      search.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
+    }
+  }
+  if (search.length) url += '?' + search.join('&');
+
+  const resp = await fetch(url);
+  const raw = await resp.text();
+
+  let data;
+  try {
     data = JSON.parse(raw);
-    } catch (e) {
+  } catch (e) {
     console.error("favourites.php returned non-JSON:", raw);
     throw new Error("favourites.php did not return JSON (check console for raw response).");
-    }
+  }
 
-    const list = document.getElementById('trailsList');
-  
-    if (!data.success || !data.routes) {
-      list.innerHTML = '<div class="no-routes">Failed to load favourites.</div>';
-      return;
-    }
-    renderRoutes(list, data.routes);
+  const list = document.getElementById('trailsList');
+  if (!list) {
+    console.warn("[loadFavourites] #trailsList not found in DOM. Skipping render.");
+    return;
+  }
+
+  if (!data.success || !data.routes) {
+    list.innerHTML = '<div class="no-routes">Failed to load favourites.</div>';
+    return;
+  }
+
+  renderRoutes(list, data.routes);
 }
+
+function initFeaturedBadgesPicker() {
+  const checks = Array.from(document.querySelectorAll('.featureBadge'));
+  const countEl = document.getElementById('featuredCount');
+  const msgEl = document.getElementById('featuredMsg');
+  const saveBtn = document.getElementById('saveFeaturedBadges');
+
+  // Not on achievements page (or no earned badges)
+  if (!countEl || !saveBtn) return;
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.ach-feature-toggle')) {
+      e.stopPropagation();
+    }
+  }, true);
+
+  function selectedCount() {
+    return checks.filter(c => c.checked).length;
+  }
+
+  function updateCount() {
+    if (countEl) countEl.textContent = String(selectedCount());
+  }
+
+  checks.forEach(c => {
+    c.addEventListener('change', () => {
+      const selected = checks.filter(x => x.checked);
+      if (selected.length > 3) {
+        c.checked = false;
+        alert('You can only feature 3 badges.');
+      }
+      updateCount();
+    });
+  });
+
+  updateCount();
+
+  saveBtn.addEventListener('click', async () => {
+    const ids = checks
+      .filter(c => c.checked)
+      .map(c => Number(c.dataset.achId))
+      .filter(Boolean)
+      .slice(0, 3);
+
+    saveBtn.disabled = true;
+
+    try {
+      const res = await fetch('api/achievements/set_featured.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ badge_ids: ids })
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!data || !data.success) {
+        alert(data?.error || 'Failed to save featured badges.');
+        return;
+      }
+
+      if (msgEl) {
+        msgEl.style.display = 'block';
+        msgEl.style.color = '#65e68c';
+        msgEl.textContent = 'Featured badges saved!';
+        setTimeout(() => { msgEl.style.display = 'none'; }, 2200);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save (see console).');
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+}
+
+function showUnlockedAchievements(data) {
+  if (Array.isArray(data?.achievements_unlocked) && data.achievements_unlocked.length) {
+    data.achievements_unlocked.forEach(a => window.showAchievementToast(a));
+    return;
+  }
+  if (data?.achievement_unlocked) window.showAchievementToast(data.achievement_unlocked);
+}
+
 
 // ✅ make toast callable from anywhere (global)
 window.showAchievementToast = function(ach){
@@ -1092,15 +1199,18 @@ window.showAchievementToast = function(ach){
   
       if (!data.success) {
         alert(data.error || 'Favourite failed');
-        return;
+        return data; // return anyway for debugging
       }
   
       const added = data.action === 'added';
   
-      starEl.textContent = added ? '★' : '☆';
-      starEl.style.opacity = added ? '1' : '0.35';
+      if (starEl) {
+        starEl.textContent = added ? '★' : '☆';
+        starEl.style.opacity = added ? '1' : '0.35';
+      }
   
-      if (data.achievement_unlocked) window.showAchievementToast(data.achievement_unlocked);
+      // ✅ show toast(s) for any unlocked achievements
+      showUnlockedAchievements(data);
   
       // ✅ Only refresh lists where it matters
       const activeTab = document.querySelector('.trails-tab.active')?.getAttribute('data-tab');
@@ -1108,11 +1218,14 @@ window.showAchievementToast = function(ach){
         refreshActiveTab();
       }
   
+      return data; // ✅ important
     } catch (err) {
       console.error(err);
       alert('Favourite failed (see console).');
+      return null;
     }
   };
+  
   
   
 // --- AJAX Login Handler (and Register Handler) ---
@@ -1261,10 +1374,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.success) {
                     isFavourited = data.action === 'added';
-                    let achievement = data.achievement_unlocked;
-                    if (achievement) {
-                        window.showAchievementToast(achievement);
-                    }
+                    showUnlockedAchievements(data);
                     favIcon.textContent = isFavourited ? '★' : '☆';
                     favIcon.style.color = isFavourited ? '#ffc300' : '#ea5f94';
                     favBtn.classList.toggle('favourited', isFavourited);
@@ -1283,7 +1393,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (shareBtn) {
         shareBtn.addEventListener('click', function() {
             const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
-            if (!routeId) return alert("Route ID missing.");
+            if (!routeId) return alert("Please select a route first (so it can be saved), then publish.");
             fetch('api/routes/share.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -1295,8 +1405,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Share error: ' + (data.error || 'Unknown error'));
                     return;
                 }
-                shareLink.value = window.location.origin + '/trails.php?route_id=' + routeId;
-                shareModal.style.display = 'flex';
+                alert('Route shared successfully');
             }).catch(() => alert('Cannot contact server.'));
         });
     }
@@ -1322,30 +1431,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-  
-
-      
-    // Tab switching logic
-    document.querySelectorAll('.trails-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('.trails-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            const which = tab.getAttribute('data-tab');
-            if (which === 'public') {
-                loadPublicRoutes();
-            } else if (which === 'todo') {
-                loadTodoRoutes();
-            } else {
-                loadFavourites();
-            }
-        });
-    });
-    // Initial load based on tab
-    if (document.querySelector('.trails-tab.active')) {
-        const which = document.querySelector('.trails-tab.active').getAttribute('data-tab');
-        if (which === 'public') { loadPublicRoutes(); }
-        else { loadFavourites(); }
-    }
     // Filters
     document.getElementById('applyFilters')?.addEventListener('click', function() {
       const filters = {
@@ -1429,6 +1514,59 @@ function initAchievementsPage() {
     modal.addEventListener('click', (e) => { if (e.target === modal) closeAchModal(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAchModal(); });
   }
+
+  function attachTrailsDoneHandler() {
+    const trailsList = document.getElementById('trailsList');
+    if (!trailsList) return;
+  
+    if (trailsList._doneHandlerAttached) return;
+    trailsList._doneHandlerAttached = true;
+  
+    trailsList.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.trails-done-btn');
+      if (!btn) return;
+  
+      e.preventDefault();
+      e.stopPropagation();
+  
+      const routeId = btn.getAttribute('data-route-id');
+      if (!routeId) return;
+  
+      // optional: ask duration
+      const duration = prompt('How many minutes did it take? (optional)', '30');
+      const durationMin = Math.max(0, parseInt(duration || '0', 10) || 0);
+  
+      try {
+        const res = await fetch('api/routes/mark_done.php', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'route_id=' + encodeURIComponent(routeId) + '&duration_min=' + encodeURIComponent(durationMin)
+        });
+  
+        const raw = await res.text();
+        let data;
+        try { data = JSON.parse(raw); }
+        catch { console.error('mark_done.php non-JSON:', raw); alert('Server returned invalid response.'); return; }
+  
+        if (!data.success) {
+          alert(data.error || 'Failed to mark done.');
+          return;
+        }
+  
+        // toast achievements (your helper)
+        showUnlockedAchievements(data);
+  
+        // refresh the active tab (so it disappears from To-Do)
+        refreshActiveTab();
+  
+      } catch (err) {
+        console.error(err);
+        alert('Failed to mark done (see console).');
+      }
+    }, true);
+  }
+  
   
   function attachTrailsSaveHandler() {
     const trailsList = document.getElementById('trailsList');
@@ -1474,10 +1612,9 @@ function initAchievementsPage() {
       pin.textContent = added ? '📌' : '📍';
       pin.style.opacity = added ? '1' : '0.35';
   
-      if (data.achievement_unlocked) window.showAchievementToast(data.achievement_unlocked);
+      showUnlockedAchievements(data);
     }, true);
   }
-  
   
   
   function attachTrailsStarHandler() {
@@ -1513,10 +1650,12 @@ function initAchievementsPage() {
       el.addEventListener('input', onFiltersChanged);
       el.addEventListener('change', onFiltersChanged);
     });
-  
+
+    attachTrailsDoneHandler();
     attachTrailsStarHandler();
     attachTrailsSaveHandler();
     initAchievementsPage();
+    initFeaturedBadgesPicker();
   
     document.getElementById('nav-login-btn')?.addEventListener('click', function(e){
       e.preventDefault();
