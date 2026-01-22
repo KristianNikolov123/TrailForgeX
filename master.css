@@ -1889,3 +1889,278 @@ footer {
   border-color: rgba(234,95,148,0.35);
   color:#fff;
 }
+
+
+/* =========================
+   Generate Route page polish
+   (keeps your theme colors)
+   ========================= */
+
+/* Page hero background wrapper (replaces inline styles) */
+.generate-hero {
+  background:
+      linear-gradient(120deg, rgba(36,20,27,0.54) 55%, rgba(89,50,71,0.78) 100%),
+      url('https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=1800&q=80')
+      center center / cover no-repeat;
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.2rem 1.2rem;
+  margin: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Soft glow / vignette */
+.generate-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+      radial-gradient(circle at 50% 35%, rgba(234,95,148,0.20) 0%, transparent 55%),
+      radial-gradient(circle at 15% 85%, rgba(230,126,34,0.15) 0%, transparent 50%),
+      linear-gradient(180deg, rgba(27,14,22,0.35), rgba(27,14,22,0.75));
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Main glass card */
+.gen-card {
+  position: relative;
+  z-index: 2;
+  width: min(560px, 96vw);
+  background: rgba(32, 13, 25, 0.74);
+  border: 1px solid rgba(234, 95, 148, 0.20);
+  box-shadow:
+      0 10px 60px rgba(68, 17, 38, 0.45),
+      0 2px 10px rgba(234, 95, 148, 0.14);
+  border-radius: 28px;
+  padding: 2.4rem 2.2rem 2.2rem;
+  backdrop-filter: blur(10px);
+}
+
+/* Title + subtitle */
+.gen-title {
+  color: #fff;
+  font-size: clamp(1.9rem, 3.2vw, 2.45rem);
+  font-weight: 850;
+  line-height: 1.1;
+  text-align: center;
+  margin-bottom: 0.55rem;
+  text-shadow: 0 2px 22px rgba(32,14,25,0.85), 0 0 30px rgba(234,95,148,0.18);
+}
+
+.gen-subtitle {
+  color: #d9a7c8;
+  font-size: 1.08rem;
+  text-align: center;
+  margin-bottom: 1.2rem;
+  opacity: 0.95;
+}
+
+/* Form layout polish */
+.gen-form {
+  gap: 1rem;
+}
+
+.gen-form label {
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  margin-top: 0.45rem;
+}
+
+/* Inputs + select unified */
+.gen-form input,
+.gen-form select {
+  width: 100%;
+  padding: 0.78rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid rgba(68, 17, 38, 0.85);
+  background: rgba(36, 20, 27, 0.88);
+  color: #f8eef7;
+  font-size: 1.05rem;
+  outline: none;
+  transition: border 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+}
+
+.gen-form input::placeholder {
+  color: rgba(248, 238, 247, 0.45);
+}
+
+.gen-form input:focus,
+.gen-form select:focus {
+  border-color: rgba(234,95,148,0.95);
+  box-shadow: 0 0 0 4px rgba(234,95,148,0.18);
+  transform: translateY(-1px);
+}
+
+/* Make select look nicer on dark bg */
+.gen-form select {
+  appearance: none;
+  background-image:
+      linear-gradient(45deg, transparent 50%, rgba(234,95,148,0.85) 50%),
+      linear-gradient(135deg, rgba(234,95,148,0.85) 50%, transparent 50%);
+  background-position:
+      calc(100% - 18px) calc(50% - 3px),
+      calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 2.2rem;
+}
+
+/* Radio mode pills */
+.mode-toggle {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin-top: 0.2rem;
+}
+
+.mode-pill {
+  flex: 1 1 210px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 14px;
+  background: rgba(47, 23, 35, 0.55);
+  border: 1px solid rgba(234,95,148,0.14);
+  color: #e6bfd6;
+  font-weight: 750;
+  transition: transform .12s ease, border .18s ease, box-shadow .18s ease;
+}
+
+.mode-pill:hover {
+  transform: translateY(-1px);
+  border-color: rgba(234,95,148,0.35);
+  box-shadow: 0 10px 30px rgba(234,95,148,0.10);
+}
+
+.mode-pill input[type="radio"] {
+  accent-color: #ea5f94;
+  transform: scale(1.05);
+}
+
+/* Small geocode helper text */
+.geocode-hint {
+  color: rgba(230,191,214,0.85);
+  font-size: 0.92em;
+  margin: 0.2rem 0 0.6rem 0.15rem;
+}
+
+/* Primary generate button refinement */
+.route-btn {
+  width: 100%;
+  padding: 0.85rem 1.2rem;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(234,95,148,0.25);
+  transform: translateZ(0);
+  transition: transform .14s ease, box-shadow .18s ease, background .25s ease;
+}
+
+.route-btn:hover {
+  box-shadow: 0 14px 40px rgba(234,95,148,0.35);
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* Top-3 choices as cards */
+.route-choices {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.choice-card {
+  background: rgba(47, 23, 35, 0.58);
+  border: 1px solid rgba(234,95,148,0.16);
+  border-radius: 18px;
+  padding: 1rem 1rem;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+  transition: transform .14s ease, border .18s ease, box-shadow .18s ease;
+}
+
+.choice-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(234,95,148,0.35);
+  box-shadow: 0 16px 44px rgba(234,95,148,0.12);
+}
+
+.choice-title {
+  color: #ea5f94;
+  font-weight: 850;
+  margin-bottom: 0.25rem;
+}
+
+.choice-meta {
+  color: rgba(230,191,214,0.92);
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.choice-actions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.7rem;
+}
+
+.choice-actions button {
+  flex: 1;
+}
+
+/* Secondary buttons (favourite/share/copy) */
+.btn-favourite,
+.btn-share,
+.btn-copy {
+  border: 1px solid rgba(234,95,148,0.22);
+  background: rgba(36, 20, 27, 0.82);
+  color: #f8eef7;
+  padding: 0.7rem 0.95rem;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform .14s ease, border .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.btn-favourite:hover,
+.btn-share:hover,
+.btn-copy:hover {
+  transform: translateY(-1px);
+  border-color: rgba(234,95,148,0.45);
+  box-shadow: 0 12px 28px rgba(234,95,148,0.12);
+}
+
+.btn-favourite:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Results panel unify */
+#route-result {
+  border: 1px solid rgba(234,95,148,0.18);
+  background: rgba(234, 95, 148, 0.08);
+  box-shadow: 0 10px 32px rgba(0,0,0,0.16);
+}
+
+/* Modal polish */
+.modal-content {
+  border: 1px solid rgba(234,95,148,0.20);
+}
+
+#shareLink {
+  border: 1px solid rgba(68, 17, 38, 0.65) !important;
+}
+
+/* Responsive spacing */
+@media (max-width: 520px) {
+  .gen-card {
+      padding: 2rem 1.2rem 1.6rem;
+      border-radius: 22px;
+  }
+  .mode-pill {
+      flex: 1 1 100%;
+  }
+}
+  

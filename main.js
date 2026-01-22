@@ -583,6 +583,7 @@ document.querySelectorAll('.trails-tab').forEach(tab => {
 
 // =============================================
 // UI: render 3 route cards + let user pick one
+// (uses CSS classes instead of inline styles)
 // =============================================
 function renderRouteChoices(routes) {
   const choicesWrap = document.getElementById('routeChoices');
@@ -595,111 +596,177 @@ function renderRouteChoices(routes) {
   choicesWrap.style.display = 'block';
   choicesWrap.innerHTML = '';
 
-  routes.slice(0, 3).forEach((r, idx) => {
-    const dist = (r.distance_km != null) ? Number(r.distance_km).toFixed(2) : '—';
-    const elev = (r.elevation_gain_m != null) ? Number(r.elevation_gain_m).toFixed(0) : '—';
-    const title = r.title || `Option ${idx + 1}`;
+  const top3 = (routes || []).slice(0, 3);
+
+  top3.forEach((r, idx) => {
+    const dist =
+      r?.distance_km != null && !Number.isNaN(Number(r.distance_km))
+        ? Number(r.distance_km).toFixed(2)
+        : '—';
+
+    const elev =
+      r?.elevation_gain_m != null && !Number.isNaN(Number(r.elevation_gain_m))
+        ? Number(r.elevation_gain_m).toFixed(0)
+        : '—';
+
+    const title = (r?.title && String(r.title).trim()) ? r.title : `Option ${idx + 1}`;
+    const summary = (r?.summary && String(r.summary).trim())
+      ? r.summary
+      : 'Preview or select to show it on the map.';
 
     const card = document.createElement('div');
-    card.style = `
-      background:rgba(234,95,148,0.08);
-      border:1px solid rgba(234,95,148,0.25);
-      border-radius:14px;
-      padding:1rem;
-      margin-top:.8rem;
-      box-shadow:0 10px 35px rgba(234,95,148,0.15);
-      cursor:pointer;
-    `;
+    card.className = 'choice-card';
 
     card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;">
-        <div style="font-weight:800;color:#fff;font-size:1.1rem;">${title}</div>
-        <div style="color:#e6bfd6;font-weight:800;">${dist} km · ⬆ ${elev} m</div>
+      <div class="choice-title">${escapeHtml(title)}</div>
+      <div class="choice-meta">${dist} km · ⬆ ${elev} m</div>
+      <div class="choice-meta" style="margin-top:.45rem;opacity:.95;">
+        ${escapeHtml(summary)}
       </div>
-      <div style="color:#d9a7c8;margin-top:.35rem;line-height:1.35;">
-        ${r.summary || 'Click to select and preview on the map.'}
-      </div>
-      <div style="margin-top:.7rem;">
-        <button type="button" style="background:#ea5f94;color:#fff;border:none;padding:.55em 1.1em;border-radius:10px;font-weight:800;cursor:pointer;">
-          Select this route
+
+      <div class="choice-actions">
+        <button type="button" class="btn-share js-preview">Preview</button>
+        <button type="button" class="cta-button route-btn js-select" style="margin-top:0;">
+          Select
         </button>
       </div>
     `;
 
-    card.addEventListener('click', async () => {
-      // Show chosen route on map
-      if (routeDistance) routeDistance.textContent = `Distance: ${Number(r.distance_km).toFixed(2)} km`;
-      if (routeElevation) routeElevation.textContent = `Elevation Gain: ${Number(r.elevation_gain_m).toFixed(0)} m`;
+    // Guard to avoid double save (card click + button click)
+    let selecting = false;
 
-      if (routeResult) routeResult.style.display = 'block';
+    const previewBtn = card.querySelector('.js-preview');
+    const selectBtn = card.querySelector('.js-select');
 
-      const mapDiv = document.getElementById('map');
-      if (mapDiv) {
-        mapDiv.style.display = 'block';
-        mapDiv.style.height = '400px';
-        mapDiv.style.width = '100%';
+    // Preview: show on map but do NOT save
+    previewBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showRouteOnMap(r, { routeResult, routeDistance, routeElevation });
+    });
+
+    // Select: show + save
+    selectBtn?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (selecting) return;
+      selecting = true;
+      selectBtn.disabled = true;
+      selectBtn.textContent = 'Selecting...';
+
+      try {
+        await selectRouteAndSave(r, { routeResult, routeDistance, routeElevation });
+      } finally {
+        // If save fails we re-enable, if succeeds you might want to keep disabled—your choice
+        selectBtn.disabled = false;
+        selectBtn.textContent = 'Select';
+        selecting = false;
       }
+    });
 
-      setTimeout(() => displayRoute(r), 250);
-
-      // Save ONLY the selected route (so DB doesn't get 3 per request)
-      // Save ONLY the selected route (so DB doesn't get 3 per request)
-        try {
-            const saveData = {
-            coordinates: r.coordinates,
-            title: r.title || 'Generated Route',
-            activity_type: document.getElementById('prefer')?.value || 'green',
-            description: r.description || '',
-            start_lat: (r.start_lat != null ? r.start_lat : null),
-            start_lng: (r.start_lng != null ? r.start_lng : null),
-            distance_km: r.distance_km,
-            elevation_gain_m: r.elevation_gain_m
-            };
-        
-            const saveResp = await fetch('api/routes/save.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(saveData)
-            });
-        
-            const raw = await saveResp.text();
-            let saveResult;
-            try { saveResult = JSON.parse(raw); }
-            catch { throw new Error('save.php returned non-JSON: ' + raw.slice(0, 200)); }
-        
-            console.log('save.php result:', saveResult);
-        
-            if (!saveResp.ok || !saveResult.success || !saveResult.route_id) {
-            throw new Error(saveResult.error || 'Save failed');
-            }
-        
-            window.currentRouteId = saveResult.route_id;
-        
-            const favBtn = document.getElementById('favouriteRouteBtn');
-            if (favBtn) favBtn.disabled = false;
-        
-            let idHidden = document.getElementById('currentRouteId');
-            if (!idHidden) {
-            idHidden = document.createElement('input');
-            idHidden.type = 'hidden';
-            idHidden.id = 'currentRouteId';
-            document.body.appendChild(idHidden);
-            }
-            idHidden.value = saveResult.route_id;
-        
-        } catch (err) {
-            console.warn('Save error:', err);
-            alert('Route was not saved, cannot favourite. Error: ' + (err.message || 'unknown'));
-        }
-  
-
-      // Scroll to map
-      routeResult?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Optional: clicking the whole card previews (not select)
+    card.addEventListener('click', () => {
+      showRouteOnMap(r, { routeResult, routeDistance, routeElevation });
     });
 
     choicesWrap.appendChild(card);
   });
 }
+
+/* ------- Helpers ------- */
+
+function showRouteOnMap(r, { routeResult, routeDistance, routeElevation }) {
+  // Text values (safe)
+  const distTxt =
+    r?.distance_km != null && !Number.isNaN(Number(r.distance_km))
+      ? `${Number(r.distance_km).toFixed(2)} km`
+      : '—';
+
+  const elevTxt =
+    r?.elevation_gain_m != null && !Number.isNaN(Number(r.elevation_gain_m))
+      ? `${Number(r.elevation_gain_m).toFixed(0)} m`
+      : '—';
+
+  if (routeDistance) routeDistance.textContent = `Distance: ${distTxt}`;
+  if (routeElevation) routeElevation.textContent = `Elevation Gain: ${elevTxt}`;
+
+  if (routeResult) routeResult.style.display = 'block';
+
+  const mapDiv = document.getElementById('map');
+  if (mapDiv) {
+    mapDiv.style.display = 'block';
+    mapDiv.style.height = '400px';
+    mapDiv.style.width = '100%';
+  }
+
+  // Your existing renderer
+  setTimeout(() => displayRoute(r), 120);
+
+  routeResult?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function selectRouteAndSave(r, { routeResult, routeDistance, routeElevation }) {
+  // Always show chosen route
+  showRouteOnMap(r, { routeResult, routeDistance, routeElevation });
+
+  // Save ONLY selected route
+  try {
+    const saveData = {
+      coordinates: r.coordinates,
+      title: r.title || 'Generated Route',
+      activity_type: document.getElementById('prefer')?.value || 'green',
+      description: r.description || '',
+      start_lat: (r.start_lat != null ? r.start_lat : null),
+      start_lng: (r.start_lng != null ? r.start_lng : null),
+      distance_km: r.distance_km,
+      elevation_gain_m: r.elevation_gain_m
+    };
+
+    const saveResp = await fetch('api/routes/save.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(saveData)
+    });
+
+    const raw = await saveResp.text();
+    let saveResult;
+    try { saveResult = JSON.parse(raw); }
+    catch { throw new Error('save.php returned non-JSON: ' + raw.slice(0, 200)); }
+
+    console.log('save.php result:', saveResult);
+
+    if (!saveResp.ok || !saveResult.success || !saveResult.route_id) {
+      throw new Error(saveResult.error || 'Save failed');
+    }
+
+    window.currentRouteId = saveResult.route_id;
+
+    const favBtn = document.getElementById('favouriteRouteBtn');
+    if (favBtn) favBtn.disabled = false;
+
+    let idHidden = document.getElementById('currentRouteId');
+    if (!idHidden) {
+      idHidden = document.createElement('input');
+      idHidden.type = 'hidden';
+      idHidden.id = 'currentRouteId';
+      document.body.appendChild(idHidden);
+    }
+    idHidden.value = saveResult.route_id;
+
+  } catch (err) {
+    console.warn('Save error:', err);
+    alert('Route was not saved, cannot favourite. Error: ' + (err.message || 'unknown'));
+  }
+}
+
+// Tiny helper to prevent injecting HTML through title/summary
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function initMiniRouteMap(minimapId, routeId) {
     fetch('api/routes/get_route_points.php?route_id=' + encodeURIComponent(routeId), {
       credentials: 'same-origin'

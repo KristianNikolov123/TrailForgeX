@@ -23,47 +23,31 @@ $route_id = null;
 })();
 </script>
 
-<section class="generate-hero" style="background:
-    linear-gradient(120deg, rgba(36,20,27,0.54) 55%, rgba(89,50,71,0.78) 100%),
-    url('https://images.unsplash.com/photo-1464983953574-0892a716854b?auto=format&fit=crop&w=1800&q=80') center center/cover no-repeat;
-    position: relative;
-    min-height:100vh;
-    min-width:100vw;
-    width:100vw;
-    max-width:100vw;
-    box-sizing:border-box;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:0;
-    margin:0;
-    overflow:hidden;">
+<section class="generate-hero">
 
-  <div style="position:relative;z-index:2;max-width:540px;width:97%;background:rgba(32,13,25,0.76);box-shadow:0 8px 45px #321926a5,0 2px 9px #ea5f9430;border-radius:30px;padding:2.6rem 1.8rem 2.9rem 1.8rem;backdrop-filter:blur(8px);margin:2rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem;">
+  <div class="gen-card">
 
-    <h1 style="color:#fff;font-size:2.35rem;font-weight:800;text-shadow:0 2px 22px #200e19, 0 1px 1px #593247, 0 0px 30px #ea5f9436;margin-bottom:0.2em;">
-      Generate Your Next Adventure Route
-    </h1>
-    <p style="color:#d9a7c8;font-size:1.12rem;margin:0 auto 0.3rem auto;">
-      Let TrailForgeX surprise you with unique paths.
-    </p>
+    <h1 class="gen-title">Generate Your Next Adventure Route</h1>
+    <p class="gen-subtitle">Let TrailForgeX surprise you with unique paths.</p>
+
 
     <!-- FORM START -->
     <form class="gen-form" method="POST" action="" id="routeForm" style="width:100%;margin-top:0.4em;">
 
       <!-- NEW: Mode toggle -->
       <label style="margin-top:.2em;">Generation Mode:</label>
-      <div style="display:flex;gap:.7em;flex-wrap:wrap;">
-        <label style="display:flex;align-items:center;gap:.5em;color:#e6bfd6;font-weight:700;">
+      <div class="mode-toggle">
+        <label class="mode-pill">
           <input type="radio" name="gen_mode" id="mode_start" value="start" checked>
           Start (and optional end)
         </label>
 
-        <label style="display:flex;align-items:center;gap:.5em;color:#e6bfd6;font-weight:700;">
+        <label class="mode-pill">
           <input type="radio" name="gen_mode" id="mode_area" value="area">
           No start/end (generate in an area)
         </label>
       </div>
+
 
       <!-- Start -->
       <div id="startBlock">
@@ -71,13 +55,13 @@ $route_id = null;
         <input type="text" id="start" name="start" placeholder="Enter address or place name">
         <input type="hidden" id="start_lat" name="start_lat">
         <input type="hidden" id="start_lng" name="start_lng">
-        <div id="start_geocoded_result" style="color:#e6bfd6;font-size:0.94em;margin:2px 0 8px 2px;"></div>
+        <div id="start_geocoded_result" class="geocode-hint"></div>
 
         <label for="end">End Location (optional, leave empty for loop):</label>
         <input type="text" id="end" name="end" placeholder="Enter address or leave empty for loop">
         <input type="hidden" id="end_lat" name="end_lat">
         <input type="hidden" id="end_lng" name="end_lng">
-        <div id="end_geocoded_result" style="color:#e6bfd6;font-size:0.94em;margin:2px 0 8px 2px;"></div>
+        <div id="end_geocoded_result" class="geocode-hint"></div>
       </div>
 
       <!-- NEW: Area mode input -->
@@ -89,7 +73,7 @@ $route_id = null;
         <input type="hidden" id="center_lat" name="center_lat">
         <input type="hidden" id="center_lng" name="center_lng">
 
-        <div id="area_geocoded_result" style="color:#e6bfd6;font-size:0.94em;margin:2px 0 8px 2px;"></div>
+        <div id="area_geocoded_result" class="geocode-hint"></div>
 
         <div style="color:#d9a7c8;font-size:.95em;opacity:.9;line-height:1.35;margin-top:.2em;">
           In this mode, TrailForgeX generates 3 loop routes inside the selected area and you pick one.
