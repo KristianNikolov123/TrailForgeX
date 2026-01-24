@@ -262,42 +262,65 @@ if ($user_id) {
 $search_rows = [];
 if ($search !== '') {
   $like = '%' . $search . '%';
-  $stmt = $connection->prepare("
-    SELECT
-      u.id, u.username, u.profile_image,
 
-      COALESCE((
-        SELECT SUM(a.points)
-        FROM user_achievements ua
-        JOIN achievements a ON a.id = ua.achievement_id
-        WHERE ua.user_id = u.id
-      ), 0) AS all_points,
+  if ($view === 'points') {
+    $stmt = $connection->prepare("
+      WITH pts AS (
+        SELECT 
+          u.id,
+          u.username,
+          u.profile_image,
+          COALESCE(SUM(a.points), 0) AS all_points,
+          COALESCE(SUM(CASE WHEN ua.earned_at >= ? AND ua.earned_at < ? THEN a.points ELSE 0 END), 0) AS week_points
+        FROM users u
+        LEFT JOIN user_achievements ua ON ua.user_id = u.id
+        LEFT JOIN achievements a ON a.id = ua.achievement_id
+        GROUP BY u.id, u.username, u.profile_image
+      ),
+      ranked AS (
+        SELECT
+          *,
+          DENSE_RANK() OVER (ORDER BY all_points DESC, username ASC) AS all_rank,
+          DENSE_RANK() OVER (ORDER BY week_points DESC, username ASC) AS week_rank
+        FROM pts
+      )
+      SELECT *
+      FROM ranked
+      WHERE username LIKE ?
+      ORDER BY all_points DESC, username ASC
+      LIMIT 25
+    ");
+    $stmt->bind_param("sss", $weekStart, $weekEnd, $like);
 
-      COALESCE((
-        SELECT SUM(a.points)
-        FROM user_achievements ua
-        JOIN achievements a ON a.id = ua.achievement_id
-        WHERE ua.user_id = u.id AND ua.earned_at >= ? AND ua.earned_at < ?
-      ), 0) AS week_points,
+  } else { // km
+    $stmt = $connection->prepare("
+      WITH kms AS (
+        SELECT 
+          u.id,
+          u.username,
+          u.profile_image,
+          COALESCE(SUM(act.distance_km), 0) AS all_km,
+          COALESCE(SUM(CASE WHEN act.completed_at >= ? AND act.completed_at < ? THEN act.distance_km ELSE 0 END), 0) AS week_km
+        FROM users u
+        LEFT JOIN activities act ON act.user_id = u.id
+        GROUP BY u.id, u.username, u.profile_image
+      ),
+      ranked AS (
+        SELECT
+          *,
+          DENSE_RANK() OVER (ORDER BY all_km DESC, username ASC) AS all_rank,
+          DENSE_RANK() OVER (ORDER BY week_km DESC, username ASC) AS week_rank
+        FROM kms
+      )
+      SELECT *
+      FROM ranked
+      WHERE username LIKE ?
+      ORDER BY all_km DESC, username ASC
+      LIMIT 25
+    ");
+    $stmt->bind_param("sss", $weekStart, $weekEnd, $like);
+  }
 
-      COALESCE((
-        SELECT SUM(act.distance_km)
-        FROM activities act
-        WHERE act.user_id = u.id
-      ), 0) AS all_km,
-
-      COALESCE((
-        SELECT SUM(act.distance_km)
-        FROM activities act
-        WHERE act.user_id = u.id AND act.completed_at >= ? AND act.completed_at < ?
-      ), 0) AS week_km
-
-    FROM users u
-    WHERE u.username LIKE ?
-    ORDER BY all_points DESC, u.username ASC
-    LIMIT 25
-  ");
-  $stmt->bind_param("sssss", $weekStart, $weekEnd, $weekStart, $weekEnd, $like);
   $stmt->execute();
   $search_rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
   $stmt->close();
@@ -362,9 +385,22 @@ include 'navbar.php';
           <?php foreach ($search_rows as $row):
             $img = avatarUrl($row['username'], $row['profile_image']);
             $isMe = $user_id && (int)$row['id'] === $user_id;
-        ?>
-        <a class="lb-row <?= $isMe ? 'me' : '' ?>" href="profile.php?user=<?= (int)$row['id'] ?>">
-            <div class="lb-rank">—</div>
+          ?>
+            <?php
+              $rAll = (int)($row['all_rank'] ?? 0);
+              $rW   = (int)($row['week_rank'] ?? 0);
+            ?>
+            <a id="lb-row-display"class="lb-row <?= $isMe ? 'me' : '' ?>" href="profile.php?user=<?= (int)$row['id'] ?>">
+
+            <div class="lb-rank lb-rank-duo">
+              <span class="lb-rank-chip lb-rank-all">
+                <?= medal($rAll) ? medal($rAll) . ' ' : '' ?>#<?= $rAll ?>
+              </span>
+              <span class="lb-rank-chip lb-rank-week">
+                W <?= medal($rW) ? medal($rW) . ' ' : '' ?>#<?= $rW ?>
+              </span>
+          </div>
+
             <img class="lb-avatar" src="<?= htmlspecialchars($img) ?>" alt="Avatar">
             <div class="lb-name">
                 @<?= htmlspecialchars($row['username']) ?>

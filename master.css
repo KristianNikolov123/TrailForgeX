@@ -2451,3 +2451,43 @@ color: #30cfd0;
   text-align: center;
 }
 }
+
+
+/* --- Search results: make rank duo fit without affecting other .lb-row uses --- */
+.lb-search-results .lb-rank.lb-rank-duo{
+  display: flex;
+  flex-direction: column;   /* stack instead of side-by-side */
+  align-items: flex-start;
+  gap: .28rem;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Make the pills compact so they fit */
+.lb-search-results .lb-rank-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: .18rem .5rem;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: .86rem;
+  line-height: 1;
+  background: rgba(234,95,148,0.10);
+  border: 1px solid rgba(234,95,148,0.22);
+  color: #f8eef7;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#lb-row-display{
+  grid-template-columns: 80px 44px 1fr auto;
+}
+/* Week chip slightly calmer */
+.lb-search-results .lb-rank-week{
+  opacity: .9;
+  background: rgba(230,191,214,0.08);
+  border-color: rgba(230,191,214,0.18);
+}

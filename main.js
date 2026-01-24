@@ -1465,23 +1465,36 @@ if (registerForm) {
   const shareLink = document.getElementById('shareLink');
   const copyShareLink = document.getElementById('copyShareLink');
   if (shareBtn) {
-      shareBtn.addEventListener('click', function() {
-          const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
-          if (!routeId) return alert("Please select a route first (so it can be saved), then publish.");
-          fetch('api/routes/share.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-              body: 'route_id=' + encodeURIComponent(routeId)
-          })
-          .then(res => res.json())
-          .then(data => {
-              if (!data.success) {
-                  alert('Share error: ' + (data.error || 'Unknown error'));
-                  return;
-              }
-              alert('Route shared successfully');
-          }).catch(() => alert('Cannot contact server.'));
-      });
+    shareBtn.addEventListener('click', function() {
+      const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
+      if (!routeId) {
+        alert("Please select a route first (so it can be saved), then publish.");
+        return;
+      }
+  
+      fetch('api/routes/share.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'route_id=' + encodeURIComponent(routeId)
+      })
+      .then(res => res.json())
+      .then(data => {
+  
+        if (!data.success) {
+          if (data.retry_after_seconds) {
+            const mins = Math.ceil(data.retry_after_seconds / 60);
+            const secs = data.retry_after_seconds % 60;
+            alert(`⏳ You can publish again in ${mins} min ${secs}s.`);
+          } else {
+            alert('Share error: ' + (data.error || 'Unknown error'));
+          }
+          return;
+        }
+  
+        alert('✅ Route shared successfully');
+      })
+      .catch(() => alert('Cannot contact server.'));
+    });  
   }
   if (closeShareModal) {
       closeShareModal.addEventListener('click', function() {

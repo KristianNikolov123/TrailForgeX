@@ -2,6 +2,7 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
 session_start();
 require_once __DIR__ . '/../achievements/award_by_metric.php';
 header('Content-Type: application/json');
@@ -10,7 +11,7 @@ header('Content-Type: application/json');
 parse_str(file_get_contents('php://input'), $vars);
 $route_id = isset($_POST['route_id']) ? intval($_POST['route_id']) : (isset($vars['route_id']) ? intval($vars['route_id']) : 0);
 
-if (!isset($_SESSION['user_id']) || !$_SESSION['user_id']) {
+if (empty($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'error' => 'You must be logged in.']);
     exit;
 }
@@ -27,9 +28,55 @@ if ($connection->connect_errno) {
     exit;
 }
 
-$connection->query("UPDATE routes SET is_public = 1 WHERE id = $route_id AND creator_id = $user_id");
+/**
+ * ✅ 30-minute cooldown check (per user)
+ * We look at the most recent share/publish time.
+ */
+$cooldown_seconds = 30 * 60;
 
-$check = $connection->prepare("SELECT 1 FROM route_shares WHERE user_id = ? AND route_id = ?");
+$cool = $connection->prepare("
+    SELECT UNIX_TIMESTAMP(shared_at)
+    FROM route_shares
+    WHERE user_id = ?
+    ORDER BY shared_at DESC
+    LIMIT 1
+");
+$cool->bind_param('i', $user_id);
+$cool->execute();
+$cool->bind_result($last_ts);
+$has_last = $cool->fetch();
+$cool->close();
+
+if ($has_last && $last_ts) {
+    $now = time();
+    $elapsed = $now - (int)$last_ts;
+
+    if ($elapsed < $cooldown_seconds) {
+        $remaining = $cooldown_seconds - $elapsed;
+        mysqli_close($connection);
+
+        echo json_encode([
+            'success' => false,
+            'error' => 'You can publish only once every 30 minutes.',
+            'retry_after_seconds' => $remaining
+        ]);
+        exit;
+    }
+}
+
+/**
+ * ✅ Publish route (secure prepared stmt)
+ * Only allow publishing your own route.
+ */
+$pub = $connection->prepare("UPDATE routes SET is_public = 1 WHERE id = ? AND creator_id = ?");
+$pub->bind_param('ii', $route_id, $user_id);
+$pub->execute();
+$pub->close();
+
+/**
+ * ✅ Insert share record if not already shared (keeps your existing logic)
+ */
+$check = $connection->prepare("SELECT 1 FROM route_shares WHERE user_id = ? AND route_id = ? LIMIT 1");
 $check->bind_param('ii', $user_id, $route_id);
 $check->execute();
 $check->store_result();
@@ -46,10 +93,10 @@ if (!$already_shared) {
 $unlockedList = tf_award_by_metric($connection, $user_id, 'share_count');
 
 mysqli_close($connection);
+
 echo json_encode([
   'success' => true,
   'action' => 'shared',
   'achievement_unlocked' => $unlockedList ? $unlockedList[0] : null,
   'achievements_unlocked' => $unlockedList
 ]);
-
