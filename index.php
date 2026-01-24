@@ -16,6 +16,16 @@ include 'navbar.php';
         <p>Join TrailForgeX to explore, track, and share your trail adventures.</p>
         <a href="generate.php" class="cta-button">Get Started</a>
     </section>
+
+    <section class="hero-stats">
+        <div class="stats-wrap">
+            <div class="stat"><div class="stat-num">12k+</div><div class="stat-label">Routes generated</div></div>
+            <div class="stat"><div class="stat-num">4.8★</div><div class="stat-label">Community rating</div></div>
+            <div class="stat"><div class="stat-num">3 sec</div><div class="stat-label">Avg. generation time</div></div>
+            <div class="stat"><div class="stat-num">100%</div><div class="stat-label">Free to start</div></div>
+        </div>
+    </section>
+
     <section class="features parallax-features">
         <h2>Why TrailForge?</h2>
         <div class="feature-cards">
@@ -33,6 +43,28 @@ include 'navbar.php';
             </div>
         </div>
     </section>
+
+    <section class="how-it-works">
+        <h2>How it works</h2>
+        <div class="steps">
+            <div class="step card">
+                <div class="step-badge">1</div>
+                    <h3>Choose a start or area</h3>
+                    <p>Enter a location—or pick a whole city to generate loops.</p>
+                </div>
+            <div class="step card">
+                <div class="step-badge">2</div>
+                <h3>Set distance & preference</h3>
+                <p>Parks, trails, or roads. Add optional elevation goals.</p>
+            </div>
+            <div class="step card">
+                <div class="step-badge">3</div>
+                <h3>Preview, save, share</h3>
+                <p>Pick your favorite option, then favourite or publish it.</p>
+            </div>
+        </div>
+    </section>
+
     <section class="testimonials">
         <h2>User Stories</h2>
         <div class="testimonial-cards">
@@ -79,9 +111,25 @@ include 'navbar.php';
         <div id="registerError"></div>
       </div>
     </div>
-    <footer>
-        <p>&copy; 2025 TrailForgeX. All rights reserved.</p>
-    </footer>
+
+    <section class="cta-band">
+        <div class="cta-band-inner">
+            <div>
+                <h2>Ready to forge your next trail?</h2>
+                <p>Generate 3 options instantly and pick the best adventure.</p>
+            </div>
+            <div class="cta-actions">
+                <a href="generate.php" class="cta-button">Generate a Route</a>
+                <?php if (!$is_logged_in): ?>
+                    <button class="btn-secondary" onclick="document.getElementById('loginModal').style.display='flex';">
+                        Log in / Sign up
+                    </button>
+                <?php endif; ?>
+            </div>
+        </div>
+    </section>
+
+    <?php include 'footer.php'; ?>
     <script src="main.js"></script>
 </body>
 </html>

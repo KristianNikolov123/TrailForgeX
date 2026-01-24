@@ -37,9 +37,7 @@ include "navbar.php";
             <div class="no-routes">No routes to show. Generate or start favouriting routes!</div>
         </div>
     </main>
-    <footer style="margin-top:2.5rem;">
-        <p>&copy; 2025 TrailForge. All rights reserved.</p>
-    </footer>
+    <?php include 'footer.php'; ?>
     <script src="main.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>

@@ -15,11 +15,13 @@ $route_id = null;
 <body>
 <script>
 (function() {
-  fetch('api/routes/check_auth.php').then(r => r.json()).then(jwt => {
-    if (!jwt || !jwt.logged_in) {
-      window.location.href = 'index.php';
-    }
-  });
+  fetch('api/routes/check_auth.php', { credentials: 'include' })
+  .then(r => r.json())
+  .then(jwt => {
+    console.log('auth check:', jwt);
+    if (!jwt || !jwt.logged_in) window.location.href = 'index.php';
+  })
+  .catch(err => console.error('auth check failed:', err));
 })();
 </script>
 
@@ -140,9 +142,7 @@ $route_id = null;
   </div>
 </section>
 
-<footer style="margin-top:2.5rem;">
-  <p>&copy; 2025 TrailForge. All rights reserved.</p>
-</footer>
+<?php include 'footer.php'; ?>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
