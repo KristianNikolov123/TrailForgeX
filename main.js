@@ -519,6 +519,14 @@ let currentTrailsTab = 'favourites'; // preventDefault
 // ===============================
 let filtersDebounceTimer = null;
 
+let trailsPage = {
+  public: 1,
+  todo: 1,
+  favourites: 1
+};
+
+const PER_PAGE = 6;
+
 function getFilters() {
 return {
   distance_min: document.getElementById('minDistance')?.value ?? '',
@@ -538,14 +546,24 @@ return !String(filters.distance_min).trim()
 }
 
 function refreshActiveTab(filters = null) {
-if (currentTrailsTab === 'public') {
-  return filters ? loadPublicRoutes(filters) : loadPublicRoutes();
+  const page = trailsPage[currentTrailsTab] || 1;
+
+  const payload = {
+    ...(filters || {}),
+    page: page,
+    per_page: PER_PAGE
+  };
+
+  if (currentTrailsTab === 'public') {
+    return loadPublicRoutes(payload);
+  }
+  if (currentTrailsTab === 'todo') {
+    return loadTodoRoutes(payload);
+  }
+  return loadFavourites(payload);
 }
-if (currentTrailsTab === 'todo') {
-  return filters ? loadTodoRoutes(filters) : loadTodoRoutes();
-}
-return filters ? loadFavourites(filters) : loadFavourites();
-}
+
+
 
 
 function onFiltersChanged() {
@@ -573,18 +591,20 @@ document.querySelector(`.trails-tab[data-tab="${tabName}"]`)?.classList.add('act
 }
 
 document.querySelectorAll('.trails-tab').forEach(tab => {
-tab.addEventListener('click', function () {
-  const which = this.getAttribute('data-tab');
+  tab.addEventListener('click', function () {
+    const which = this.getAttribute('data-tab');
 
-  // ✅ update state + active class
-  setTrailsTab(which);
+    // update state + active class
+    setTrailsTab(which);
 
-  // ✅ load correct list
-  if (which === 'public') loadPublicRoutes();
-  else if (which === 'todo') loadTodoRoutes();
-  else loadFavourites();
+    // 🔑 reset page for this tab
+    trailsPage[which] = 1;
+
+    // load correct list (page 1)
+    refreshActiveTab();
+  });
 });
-});
+
 
 
 // =============================================
@@ -897,7 +917,53 @@ function renderRoutes(list, routes) {
   }
 }
 
-      
+
+function renderPagination(containerId, pagination, onPageClick) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  if (!pagination || !pagination.total_pages || pagination.total_pages <= 1) {
+    el.innerHTML = '';
+    return;
+  }
+
+  const page = Number(pagination.page) || 1;
+  const totalPages = Number(pagination.total_pages) || 1;
+
+  const windowSize = 2;
+  const start = Math.max(1, page - windowSize);
+  const end = Math.min(totalPages, page + windowSize);
+
+  const btnHtml = (label, p, disabled = false, active = false) => {
+    if (disabled) return `<span class="pagination-btn is-disabled">${label}</span>`;
+    if (active) return `<span class="pagination-btn is-active" aria-current="page">${label}</span>`;
+    return `<button class="pagination-btn" type="button" data-page="${p}">${label}</button>`;
+  };
+
+  let html = `<nav class="pagination" aria-label="Pagination"><div class="pagination-list">`;
+
+  html += btnHtml('← Prev', page - 1, page <= 1);
+
+  if (start > 1) html += btnHtml('1', 1, false, page === 1);
+  if (start > 2) html += `<span class="pagination-ellipsis">…</span>`;
+
+  for (let p = start; p <= end; p++) {
+    html += btnHtml(String(p), p, false, p === page);
+  }
+
+  if (end < totalPages - 1) html += `<span class="pagination-ellipsis">…</span>`;
+  if (end < totalPages) html += btnHtml(String(totalPages), totalPages, false, page === totalPages);
+
+  html += btnHtml('Next →', page + 1, page >= totalPages);
+  html += `</div></nav>`;
+
+  el.innerHTML = html;
+
+  el.querySelectorAll('button[data-page]').forEach(b => {
+    b.addEventListener('click', () => onPageClick(Number(b.dataset.page)));
+  });
+}
+
 
       
 // --- Map Modal for Viewing Public/Favourite Route ---
@@ -1047,12 +1113,29 @@ function openRouteMapModal(route_id, routeTitle, routeMeta) {
     }
   
     const list = document.getElementById('trailsList');
+
     if (!data.success || !data.routes) {
       list.innerHTML = '<div class="no-routes">Failed to load To-Do routes.</div>';
+      const pag = document.getElementById('trailsPagination');
+      if(pag) {
+        pag.innerHTML = '';
+      }
+      return;
+    }
+  
+    if (!data.routes.length) {
+      list.innerHTML = '<div class="no-routes">No routes to show.</div>';
+      const pag = document.getElementById('trailsPagination');
+      if(pag) pag.innerHTML = '';
       return;
     }
   
     renderRoutes(list, data.routes);
+
+    renderPagination('trailsPagination', data.pagination, (newPage) => {
+      trailsPage[currentTrailsTab] = newPage;
+      refreshActiveTab();
+    });
   }
   
 
@@ -1084,47 +1167,76 @@ function openRouteMapModal(route_id, routeTitle, routeMeta) {
   
     if (!data.success || !data.routes) {
       list.innerHTML = '<div class="no-routes">Failed to load public routes.</div>';
+      const pag = document.getElementById('trailsPagination');
+      if(pag) pag.innerHTML = '';
+      return;
+    }
+  
+    if (!data.routes.length) {
+      list.innerHTML = '<div class="no-routes">No routes to show.</div>';
+      const pag = document.getElementById('trailsPagination');
+      if(pag) pag.innerHTML = '';
       return;
     }
   
     renderRoutes(list, data.routes);
-  }    
+  
+    renderPagination('trailsPagination', data.pagination, (newPage) => {
+      trailsPage[currentTrailsTab] = newPage;
+      refreshActiveTab();
+    });
+  }
+  
 
 async function loadFavourites(filters = {}) {
-let url = 'api/routes/favourites.php';
-const search = [];
+  let url = 'api/routes/favourites.php';
+  const search = [];
 
-for (const key in filters) {
-  const v = filters[key];
-  if (v !== undefined && v !== null && String(v).trim() !== '') {
-    search.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
+  for (const key in filters) {
+    const v = filters[key];
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      search.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
+    }
   }
-}
-if (search.length) url += '?' + search.join('&');
+  if (search.length) url += '?' + search.join('&');
 
-const resp = await fetch(url);
-const raw = await resp.text();
+  const resp = await fetch(url, { credentials: 'same-origin' });
+  const raw = await resp.text();
 
-let data;
-try {
-  data = JSON.parse(raw);
-} catch (e) {
-  console.error("favourites.php returned non-JSON:", raw);
-  throw new Error("favourites.php did not return JSON (check console for raw response).");
-}
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    console.error("favourites.php returned non-JSON:", raw);
+    throw new Error("favourites.php did not return JSON (check console for raw response).");
+  }
 
-const list = document.getElementById('trailsList');
-if (!list) {
-  console.warn("[loadFavourites] #trailsList not found in DOM. Skipping render.");
-  return;
-}
+  const list = document.getElementById('trailsList');
+  if (!list) {
+    console.warn("[loadFavourites] #trailsList not found in DOM. Skipping render.");
+    return;
+  }
 
-if (!data.success || !data.routes) {
-  list.innerHTML = '<div class="no-routes">Failed to load favourites.</div>';
-  return;
-}
+  if (!data.success || !data.routes) {
+    list.innerHTML = '<div class="no-routes">Failed to load favourite routes.</div>';
+    const pag = document.getElementById('trailsPagination');
+    if(pag) pag.innerHTML = '';
+    return;
+  }
 
-renderRoutes(list, data.routes);
+  if (!data.routes.length) {
+    list.innerHTML = '<div class="no-routes">No routes to show.</div>';
+    const pag = document.getElementById('trailsPagination');
+    if(pag) pag.innerHTML = '';
+    return;
+  }
+
+  renderRoutes(list, data.routes);
+
+  renderPagination('trailsPagination', data.pagination, (newPage) => {
+    trailsPage[currentTrailsTab] = newPage;
+    refreshActiveTab();
+  });
 }
 
 function initFeaturedBadgesPicker() {

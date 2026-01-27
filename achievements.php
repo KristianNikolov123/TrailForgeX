@@ -10,6 +10,8 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once 'includes/dbconn.php';
+require_once 'includes/pagination.php';
+
 $user_id = (int)$_SESSION['user_id'];
 
 // Optional catch-up award (silent sync)
@@ -77,12 +79,24 @@ $stmtF->close();
 
 $featuredSet = array_flip(array_filter([(int)$fb1, (int)$fb2, (int)$fb3], fn($x) => $x > 0));
 
-/*
-  This page shows:
-  - all achievements
-  - whether the user earned them
-  - earned date if yes
-*/
+/* -------------------------
+   Pagination setup
+--------------------------*/
+$perPage = 12;
+$page = (isset($_GET['page']) && ctype_digit($_GET['page'])) ? (int)$_GET['page'] : 1;
+$page = max(1, $page);
+$offset = ($page - 1) * $perPage;
+
+// total achievements count
+$stmt = $connection->prepare("SELECT COUNT(*) FROM achievements");
+$stmt->execute();
+$stmt->bind_result($totalItems);
+$stmt->fetch();
+$stmt->close();
+
+/* -------------------------
+   Load ONE PAGE of achievements
+--------------------------*/
 $sql = "
   SELECT 
     a.id, a.code, a.title, a.description, a.icon, a.points, a.target, a.metric,
@@ -91,17 +105,21 @@ $sql = "
   LEFT JOIN user_achievements ua
     ON ua.achievement_id = a.id AND ua.user_id = ?
   ORDER BY (ua.earned_at IS NULL) ASC, ua.earned_at DESC, a.id ASC
+  LIMIT ? OFFSET ?
 ";
 
 $stmt = $connection->prepare($sql);
-$stmt->bind_param('i', $user_id);
+$stmt->bind_param('iii', $user_id, $perPage, $offset);
 $stmt->execute();
 $result = $stmt->get_result();
 $achievements = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
+$pagination = render_pagination($totalItems, $perPage, $page, 'achievements.php');
+
 include 'includes/navbar.php';
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -226,6 +244,7 @@ include 'includes/navbar.php';
         </div>
       <?php endforeach; ?>
     </section>
+    <?= $pagination ?>
   </main>
 
   <!-- Modal -->

@@ -1,6 +1,15 @@
 <?php
-include "includes/navbar.php";
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit;
+}
+
+require_once 'includes/dbconn.php';
+include 'includes/navbar.php';
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,10 +41,10 @@ include "includes/navbar.php";
             </div>
             <button id="applyFilters" class="filter-apply-btn">Apply Filters</button>
         </div>
-        <div id="trailsList" class="trails-list">
-            <!-- Routes loaded here via AJAX/JS -->
-            <div class="no-routes">No routes to show. Generate or start favouriting routes!</div>
-        </div>
+
+        <div id="trailsList" class="trails-list"></div>
+        <div id="trailsPagination"></div>
+
     </main>
     <?php include 'includes/footer.php'; ?>
     <script src="main.js"></script>
