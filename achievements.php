@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id'])) {
   exit;
 }
 
-require_once 'dbconn.php';
+require_once 'includes/dbconn.php';
 $user_id = (int)$_SESSION['user_id'];
 
 // Optional catch-up award (silent sync)
@@ -100,7 +100,7 @@ $result = $stmt->get_result();
 $achievements = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-include 'navbar.php';
+include 'includes/navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -250,6 +250,7 @@ include 'navbar.php';
     </div>
   </div>
 
+  <?php include 'includes/footer.php'; ?>
   <script src="main.js"></script>
 </body>
 </html>

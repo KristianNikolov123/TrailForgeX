@@ -6,7 +6,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-require_once 'dbconn.php';
+require_once 'includes/dbconn.php';
 $viewer_id = (int)$_SESSION['user_id'];
 $user_id = $viewer_id;
 
@@ -22,6 +22,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id === $viewer_id) {
     $updates = [];
     $params  = [];
     $types   = '';
+
+    // --- Update username ---
+    if (isset($_POST['username'])) {
+        $newUsername = trim($_POST['username']);
+
+        // basic validation
+        if ($newUsername === '' || strlen($newUsername) < 3 || strlen($newUsername) > 20) {
+            $_SESSION['profile_error'] = 'Username must be 3–20 characters.';
+            header('Location: profile.php');
+            exit;
+        }
+
+        // allow letters, numbers, underscore, dot
+        if (!preg_match('/^[a-zA-Z0-9_.]+$/', $newUsername)) {
+            $_SESSION['profile_error'] = 'Username can contain only letters, numbers, "_" and "."';
+            header('Location: profile.php');
+            exit;
+        }
+
+        // check uniqueness (ignore yourself)
+        $chk = $connection->prepare("SELECT id FROM users WHERE username = ? AND id != ? LIMIT 1");
+        $chk->bind_param('si', $newUsername, $user_id);
+        $chk->execute();
+        $chk->store_result();
+
+        if ($chk->num_rows > 0) {
+            $chk->close();
+            $_SESSION['profile_error'] = 'That username is already taken.';
+            header('Location: profile.php');
+            exit;
+        }
+        $chk->close();
+
+        $updates[] = 'username = ?';
+        $params[]  = $newUsername;
+        $types    .= 's';
+    }
+
 
     // --- Update bio ---
     if (isset($_POST['bio'])) {
@@ -177,7 +215,7 @@ if (count($badgesToShow) < 3) {
 }
 
 
-include 'navbar.php';
+include 'includes/navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -189,112 +227,152 @@ include 'navbar.php';
 </head>
 <body>
 
-<main class="profile-main"
-      style="max-width:560px;margin:2em auto 3em auto;
-             background:#241b24;padding:1.9em 2.3em;
-             border-radius:16px;box-shadow:0 3px 39px #ea5f9430;">
+<main class="profile-page">
+  <div class="profile-shell">
 
-    <h2 style="color:#ea5f94;margin-bottom:.7em;">My Profile</h2>
+    <!-- LEFT: Profile card -->
+    <section class="profile-card">
+      <div class="profile-cover"></div>
 
-    <?php if (!empty($_SESSION['profile_success'])): ?>
-        <div style="color:#65e68c;margin-bottom:1em;">Profile updated successfully!</div>
+      <div class="profile-header">
+        <img
+          class="profile-avatar"
+          src="<?= htmlspecialchars(
+            $profile_image ?: 'https://api.dicebear.com/6.x/identicon/svg?seed=' . urlencode($username)
+          ) ?>"
+          alt="Profile image"
+        >
+        <div class="profile-identity">
+          <div class="profile-username">@<?= htmlspecialchars($username) ?></div>
+          <div class="profile-email"><?= htmlspecialchars($email) ?></div>
+        </div>
+      </div>
+
+      <?php if (!empty($_SESSION['profile_success'])): ?>
+        <div class="profile-alert success">Profile updated successfully!</div>
         <?php unset($_SESSION['profile_success']); ?>
-    <?php endif; ?>
+      <?php endif; ?>
 
-    <?php if (!empty($_SESSION['profile_error'])): ?>
-        <div style="color:#ff6b6b;margin-bottom:1em;">
-            <?= htmlspecialchars($_SESSION['profile_error']) ?>
+      <?php if (!empty($_SESSION['profile_error'])): ?>
+        <div class="profile-alert error">
+          <?= htmlspecialchars($_SESSION['profile_error']) ?>
         </div>
         <?php unset($_SESSION['profile_error']); ?>
-    <?php endif; ?>
+      <?php endif; ?>
 
-    <div style="display:flex;align-items:center;gap:1.5em;margin-bottom:1.5em;">
-        <img
-            src="<?= htmlspecialchars(
-                $profile_image ?: 'https://api.dicebear.com/6.x/identicon/svg?seed=' . urlencode($username)
-            ) ?>"
-            alt="Profile image"
-            style="border-radius:50%;width:90px;height:90px;
-                   background:#332033;object-fit:cover;
-                   border:2px solid #ea5f94;"
-        >
-        <div>
-            <div style="font-size:1.25em;font-weight:bold;color:#fff;">
-                @<?= htmlspecialchars($username) ?>
+      <div class="profile-meta-row">
+        <span class="profile-pill">
+          Joined: <?= htmlspecialchars(date('Y-m-d', strtotime($created_at))) ?>
+        </span>
+        <?php if ($user_id !== $viewer_id): ?>
+          <span class="profile-pill">Viewing profile</span>
+        <?php else: ?>
+          <span class="profile-pill">Your account</span>
+        <?php endif; ?>
+      </div>
+
+      <div class="profile-body">
+        <h3 class="profile-section-title">Bio</h3>
+        <div class="profile-bio">
+            <?= nl2br(htmlspecialchars($bio ?: 'No bio yet.')) ?>
+        </div>
+
+        <?php if ($user_id === $viewer_id): ?>
+            <div style="margin-top:1rem;">
+            <button class="edit-open-btn" type="button" data-modal-open>
+                Edit profile
+            </button>
             </div>
-            <div style="color:#c5a2c7;">
-                <?= htmlspecialchars($email) ?>
-            </div>
-        </div>
-    </div>
+        <?php endif; ?>
+      </div>
 
-    <div style="margin-bottom:1em;color:#ead0ed;">
-        <b>Bio:</b><br>
-        <?= nl2br(htmlspecialchars($bio ?: 'No bio yet.')) ?>
-    </div>
 
-    <div style="color:#968dab;font-size:.94em;">
-        Joined: <?= htmlspecialchars(date('Y-m-d', strtotime($created_at))) ?>
-    </div>
-    <hr style="margin:2em 0 1.1em 0;border-color:#512545;">
-
-    <section class="profile-achievements">
-    <div class="profile-ach-head">
-        <h3>Achievements</h3>
-        <a class="profile-ach-viewall" href="achievements.php">View all</a>
-    </div>
-
-    <?php if (empty($badgesToShow)): ?>
-        <div class="profile-ach-empty">
-        No achievements yet. Generate, save, favourite, or share routes to earn badges.
-        <div style="margin-top:.8em;">
-            <a class="cta-button" style="display:inline-block;padding:.55em 1.2em;" href="generate.php">Generate a route</a>
-        </div>
-        </div>
-    <?php else: ?>
-        <div class="profile-ach-row">
-        <?php foreach ($badgesToShow as $b): ?>
-            <a class="profile-ach-card" href="achievements.php#ach_<?= (int)$b['id'] ?>">
-            <div class="profile-ach-icon"><?= htmlspecialchars($b['icon']) ?></div>
-            <div class="profile-ach-title"><?= htmlspecialchars($b['title']) ?></div>
-            <div class="profile-ach-date">
-                <?= htmlspecialchars(date('Y-m-d', strtotime($b['earned_at']))) ?>
-            </div>
-            </a>
-        <?php endforeach; ?>
-        </div>
-        <div class="profile-ach-hint">
-        Tip: on the Achievements page you’ll be able to pick 3 badges to feature on your profile.
-        </div>
-    <?php endif; ?>
     </section>
 
+    <!-- RIGHT: Achievements + Edit panel -->
+    <aside class="profile-side">
 
-    <hr style="margin:2em 0 1.1em 0;border-color:#512545;">
-    <?php if ($user_id === $viewer_id): ?>
-        <form method="post" enctype="multipart/form-data">
-            <label style="color:#ea5f94;">Edit Bio</label>
-            <textarea
-                name="bio"
-                rows="3"
-                style="width:100%;margin-bottom:1em;
-                    resize:vertical;padding:.7em;
-                    border-radius:7px;background:#2b1d29;
-                    color:#fff;"
-            ><?= htmlspecialchars($bio) ?></textarea>
+      <section class="profile-panel">
+        <div class="profile-panel-head">
+          <h3>Achievements</h3>
+          <a href="achievements.php">View all</a>
+        </div>
 
-            <label style="color:#ea5f94;">Profile image</label>
-            <input type="file" name="profile_image" accept="image/*" style="margin-bottom:1em;">
+        <?php if (empty($badgesToShow)): ?>
+          <div class="profile-ach-empty">
+            No achievements yet. Generate, save, favourite, or share routes to earn badges.
+            <div style="margin-top:.9rem;">
+              <a class="cta-button" style="display:inline-block;padding:.55em 1.2em;" href="generate.php">
+                Generate a route
+              </a>
+            </div>
+          </div>
+        <?php else: ?>
+          <div class="profile-ach-row">
+            <?php foreach ($badgesToShow as $b): ?>
+              <a class="profile-ach-card" href="achievements.php#ach_<?= (int)$b['id'] ?>">
+                <div class="profile-ach-icon"><?= htmlspecialchars($b['icon']) ?></div>
+                <div class="profile-ach-title"><?= htmlspecialchars($b['title']) ?></div>
+                <div class="profile-ach-date">
+                  <?= htmlspecialchars(date('Y-m-d', strtotime($b['earned_at']))) ?>
+                </div>
+              </a>
+            <?php endforeach; ?>
+          </div>
+          <div class="profile-ach-hint">
+            Tip: on the Achievements page you’ll be able to pick 3 badges to feature on your profile.
+          </div>
+        <?php endif; ?>
+      </section>
 
-            <button type="submit"
-                    style="padding:.54em 2.3em;
-                        background:#ea5f94;color:#fff;
-                        font-weight:bold;border-radius:7px;border:none;">
-                Save Changes
-            </button>
-        </form>
-    <?php endif; ?>
+    </aside>
+  </div>
 </main>
 
+<?php if ($user_id === $viewer_id): ?>
+  <div id="editModal" class="modal-backdrop" aria-hidden="true">
+    <div class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+      <div class="modal-head">
+        <h3 id="editTitle">Edit profile</h3>
+        <button type="button" class="modal-x" data-modal-close>✕</button>
+      </div>
+
+      <form class="profile-form" method="post" enctype="multipart/form-data">
+        <div class="form-row">
+          <label for="username">Username</label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            value="<?= htmlspecialchars($username) ?>"
+            maxlength="20"
+            required
+          >
+          <div class="modal-help">3–20 chars. Letters, numbers, “_” and “.”</div>
+        </div>
+
+        <div class="form-row">
+          <label for="bio">Bio</label>
+          <textarea id="bio" name="bio" rows="4"><?= htmlspecialchars($bio) ?></textarea>
+        </div>
+
+        <div class="form-row">
+          <label for="profile_image">Profile image</label>
+          <input id="profile_image" type="file" name="profile_image" accept="image/*">
+          <div class="modal-help">Tip: square images look best.</div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="save-btn" type="submit">Save changes</button>
+          <button class="cancel-btn" type="button" data-modal-close>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<?php endif; ?>
+
+<?php include 'includes/footer.php'; ?>
+<script src="main.js" defer></script>
 </body>
 </html>

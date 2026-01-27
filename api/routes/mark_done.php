@@ -12,7 +12,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 $user_id = (int)$_SESSION['user_id'];
 
-require_once __DIR__ . '/../../dbconn.php';
+require_once __DIR__ . '/../../includes/dbconn.php';
 
 $route_id = (int)($_POST['route_id'] ?? 0);
 $duration_min = (int)($_POST['duration_min'] ?? 0);

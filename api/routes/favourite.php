@@ -34,7 +34,7 @@ if (!$route_id) {
 }
 
 // DB
-require_once __DIR__ . '/../../dbconn.php';
+require_once __DIR__ . '/../../includes/dbconn.php';
 if (!isset($connection) || !($connection instanceof mysqli) || $connection->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'Database connection failed.']);
     exit;

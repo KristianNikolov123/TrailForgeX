@@ -7,7 +7,7 @@ if (!isset($_SESSION['user_id'])) {
   exit;
 }
 
-require_once __DIR__ . '/../../dbconn.php';
+require_once __DIR__ . '/../../includes/dbconn.php';
 
 $user_id = (int)$_SESSION['user_id'];
 $code = $_GET['code'] ?? 'first_favourite';

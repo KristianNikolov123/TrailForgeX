@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   exit;
 }
 
-require_once __DIR__ . '/../../dbconn.php';
+require_once __DIR__ . '/../../includes/dbconn.php';
 if (!isset($connection) || $connection->connect_errno) {
   echo json_encode(['success' => false, 'error' => 'DB connection failed']);
   exit;

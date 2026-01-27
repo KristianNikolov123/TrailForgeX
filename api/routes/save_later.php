@@ -2,7 +2,7 @@
 session_start();
 header('Content-Type: application/json; charset=utf-8');
 
-require_once __DIR__ . '/../../dbconn.php';
+require_once __DIR__ . '/../../includes/dbconn.php';
 require_once __DIR__ . '/../achievements/award.php';
 
 if (!isset($_SESSION['user_id'])) {

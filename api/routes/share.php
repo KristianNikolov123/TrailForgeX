@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$route_id) {
     exit;
 }
 
-require_once '../../dbconn.php';
+require_once '../../includes/dbconn.php';
 if ($connection->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'Database connection failed.']);
     exit;

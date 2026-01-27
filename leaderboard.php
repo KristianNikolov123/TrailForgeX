@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'dbconn.php';
+require_once 'includes/dbconn.php';
 
 $limit = 100;
 $user_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
@@ -327,7 +327,7 @@ if ($search !== '') {
 }
 
 
-include 'navbar.php';
+include 'includes/navbar.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -652,7 +652,7 @@ include 'navbar.php';
   <?php endif; ?>
 </main>
 
-<?php include 'footer.php'; ?>
+<?php include 'includes/footer.php'; ?>
 
 </body>
 </html>

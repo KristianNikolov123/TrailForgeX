@@ -1,5 +1,5 @@
 <?php
-include "navbar.php";
+include "includes/navbar.php";
 $route = null;
 $route_id = null;
 ?>
@@ -142,7 +142,7 @@ $route_id = null;
   </div>
 </section>
 
-<?php include 'footer.php'; ?>
+<?php include 'includes/footer.php'; ?>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />

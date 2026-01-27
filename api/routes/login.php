@@ -21,7 +21,7 @@ if (!$username || !$password) {
     exit;
 }
 
-require_once '../../dbconn.php';
+require_once '../../includes/dbconn.php';
 if ($connection->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'DB connection failed']);
     exit;

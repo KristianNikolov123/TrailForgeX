@@ -1749,3 +1749,47 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('loginModal').style.display = 'flex';
   });
 });
+
+/* =========================
+   PROFILE EDIT MODAL
+========================= */
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('editModal');
+  if (!modal) return;
+
+  function openModal() {
+    document.body.style.overflow = 'hidden';
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+
+    const first = modal.querySelector('#username') || modal.querySelector('input, textarea, button');
+    if (first) first.focus();
+  }
+
+  function closeModal() {
+    document.body.style.overflow = '';
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  // open (supports 1 or many open buttons)
+  document.querySelectorAll('[data-modal-open]').forEach(btn => {
+    btn.addEventListener('click', openModal);
+  });
+
+  // close buttons inside modal
+  modal.querySelectorAll('[data-modal-close]').forEach(btn => {
+    btn.addEventListener('click', closeModal);
+  });
+
+  // click backdrop closes
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  // ESC closes
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
+  });
+});
+
