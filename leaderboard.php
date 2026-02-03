@@ -1,6 +1,8 @@
 <?php
-session_start();
-require_once 'includes/dbconn.php';
+
+$AUTH_PAGE_NAME = 'the leaderboard';
+require_once __DIR__ . '/includes/auth_guard.php';
+require_once __DIR__ . '/includes/dbconn.php';
 
 $limit = 100;
 $user_id = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;

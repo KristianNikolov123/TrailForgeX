@@ -30,9 +30,15 @@ try {
 
     // Supply user_id by session or default for now
     session_start();
-    $creator_id = $_SESSION['user_id'] ?? 1;
+    if (empty($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Not authenticated']);
+        exit;
+    }
+    $creator_id = (int)$_SESSION['user_id'];
+
     $title = $data['title'] ?? "Route from (" . $data['start_lat'] . ", " . $data['start_lng'] . ")";
-    $desc = $data['description'] ?? "Generated route.";
+    $desc = $data['description'];
     $activity_type = $data['activity_type'] ?? 'run';
     $distance_km = $data['distance_km'] ?? 0;
     $elevation = $data['elevation_gain_m'] ?? 0;

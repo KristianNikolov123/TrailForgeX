@@ -1,9 +1,11 @@
 <?php
-include "includes/navbar.php";
+$AUTH_PAGE_NAME = 'route generation';
+require_once __DIR__ . '/includes/auth_guard.php';   // blocks access if not logged in
+require_once __DIR__ . '/includes/navbar.php';
+
 $route = null;
 $route_id = null;
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,17 +15,7 @@ $route_id = null;
   <link rel="stylesheet" href="master.css">
 </head>
 <body>
-<script>
-(function() {
-  fetch('api/routes/check_auth.php', { credentials: 'include' })
-  .then(r => r.json())
-  .then(jwt => {
-    console.log('auth check:', jwt);
-    if (!jwt || !jwt.logged_in) window.location.href = 'index.php';
-  })
-  .catch(err => console.error('auth check failed:', err));
-})();
-</script>
+
 
 <section class="generate-hero">
 
@@ -122,7 +114,7 @@ $route_id = null;
         <button class="btn-favourite" id="favouriteRouteBtn" disabled type="button" title="Add to Favourites">
           <span id="favouriteIcon" style="font-size:1.5em;color:#ea5f94;">☆</span> Favourite
         </button>
-        <button class="btn-share" id="shareRouteBtn" type="button" title="Share this Route">
+        <button class="btn-share" id="shareRouteBtn" disabled type="button" title="Share this Route">
           <span style="font-size:1.3em;">🔗</span> Publish
         </button>
       </div>
@@ -141,6 +133,36 @@ $route_id = null;
 
   </div>
 </section>
+
+<div id="routeNameModal" class="modal">
+      <div class="modal-content">
+        <span class="close" id="routeNameClose">&times;</span>
+
+        <h2 style="margin-top:0;">Name your route</h2>
+
+        <p id="routeNameDesc" style="margin: .3rem 0 1rem; opacity:.9;">
+          Give it a name so you can find it easily later.
+        </p>
+
+        <div id="routeNameHint" style="font-size:.92rem;opacity:.85;margin:-.4rem 0 .7rem;">
+          Leave empty to use <b>Start → End</b>.
+        </div>
+
+
+        <input
+          id="routeNameInput"
+          type="text"
+          maxlength="80"
+          placeholder="e.g. Vitosha 100"
+          style="width:100%; padding:.6rem .75rem; border-radius:8px; border:1px solid #ea5f9445; background:#25111a; color:#e6bfd6; outline:none;"
+        />
+
+        <div style="display:flex; gap:.6rem; justify-content:flex-end; margin-top:1rem;">
+          <button id="routeNameCancel" class="btn-copy" type="button" style="background:#5a2a3d;">Cancel</button>
+          <button id="routeNameSave" class="btn-copy" type="button">Save</button>
+        </div>
+      </div>
+    </div>
 
 <?php include 'includes/footer.php'; ?>
 

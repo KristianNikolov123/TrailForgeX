@@ -1,12 +1,8 @@
 <?php
-session_start();
-if (!isset($_SESSION['user_id'])) {
-    header('Location: index.php');
-    exit;
-}
-
-require_once 'includes/dbconn.php';
-include 'includes/navbar.php';
+$AUTH_PAGE_NAME = 'the trails';
+require_once __DIR__ . '/includes/auth_guard.php';
+require_once __DIR__ . '/includes/dbconn.php';
+require_once __DIR__ . '/includes/navbar.php';
 ?>
 
 

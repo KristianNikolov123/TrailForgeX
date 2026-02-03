@@ -1,12 +1,9 @@
 <?php
-session_start();
 
-if (!isset($_SESSION['user_id'])) {
-    header('Location: index.php');
-    exit;
-}
+$AUTH_PAGE_NAME = 'your profile';
+require_once __DIR__ . '/includes/auth_guard.php';
+require_once __DIR__ . '/includes/dbconn.php';
 
-require_once 'includes/dbconn.php';
 $viewer_id = (int)$_SESSION['user_id'];
 $user_id = $viewer_id;
 

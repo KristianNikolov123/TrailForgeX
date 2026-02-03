@@ -46,6 +46,10 @@ async function geocodeAddress(query) {
   }
 }
 
+window.lastStartDisplayName = '';
+window.lastEndDisplayName = '';
+window.lastAreaDisplayName = '';
+
 // Map initialization
 let map = null;
 let routeLayer = null;
@@ -385,6 +389,8 @@ genForm.addEventListener('submit', async function(e) {
           if (el) el.textContent = 'Found: ' + startLocation.display_name;
         }
       }
+      window.lastStartDisplayName = startLocation?.display_name || startQuery;
+
       if (!startLocation) throw new Error('Could not find start location');
 
       document.getElementById('start_lat').value = startLocation.lat;
@@ -405,6 +411,8 @@ genForm.addEventListener('submit', async function(e) {
             if (el) el.textContent = 'Found: ' + endLocation.display_name;
           }
         }
+        window.lastEndDisplayName = endLocation?.display_name || endQuery;
+
 
         if (endLocation) {
           document.getElementById('end_lat').value = endLocation.lat;
@@ -437,6 +445,8 @@ genForm.addEventListener('submit', async function(e) {
           if (el) el.textContent = 'Found: ' + center.display_name;
         }
       }
+      window.lastAreaDisplayName = center?.display_name || areaQuery;
+
       if (!center) throw new Error('Could not find that area');
 
       document.getElementById('center_lat').value = center.lat;
@@ -729,15 +739,20 @@ setTimeout(() => displayRoute(r), 120);
 routeResult?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+
+const favBtn = document.getElementById('favouriteRouteBtn');
+const favIcon = document.getElementById('favouriteIcon');
+
 async function selectRouteAndSave(r, { routeResult, routeDistance, routeElevation }) {
 // Always show chosen route
 showRouteOnMap(r, { routeResult, routeDistance, routeElevation });
 
 // Save ONLY selected route
 try {
+  const routeLabel = getDefaultRouteLabel();
   const saveData = {
     coordinates: r.coordinates,
-    title: r.title || 'Generated Route',
+    title: (r.title && r.title.trim()) ? r.title : routeLabel,
     activity_type: document.getElementById('prefer')?.value || 'green',
     description: r.description || '',
     start_lat: (r.start_lat != null ? r.start_lat : null),
@@ -748,9 +763,11 @@ try {
 
   const saveResp = await fetch('api/routes/save.php', {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(saveData)
   });
+  
 
   const raw = await saveResp.text();
   let saveResult;
@@ -765,8 +782,10 @@ try {
 
   window.currentRouteId = saveResult.route_id;
 
-  const favBtn = document.getElementById('favouriteRouteBtn');
   if (favBtn) favBtn.disabled = false;
+
+  const pubBtn = document.getElementById('shareRouteBtn');
+  if (pubBtn) pubBtn.disabled = false;
 
   let idHidden = document.getElementById('currentRouteId');
   if (!idHidden) {
@@ -875,7 +894,9 @@ function renderRoutes(list, routes) {
       route.mode === 'loop_from_start' ? 'Loop' : 'End'
     );
     
-    const routeLabel = `${startName} → ${endName}`      
+    const routeTitle = (route.title && String(route.title).trim())
+    ? String(route.title).trim()
+    : `${startName} → ${endName}`;   // fallback if no title
     const minimapId = `minimap_${route.id}`;
     const isFav = route.is_favourited == 1;
     const isSaved = Number(route.is_saved) === 1 || Number(route.is_todo) === 1;
@@ -886,7 +907,8 @@ function renderRoutes(list, routes) {
       </div>
 
       <div class="trails-route-names-overlay">
-        🌄 ${routeLabel}
+        🌄 ${escapeHtml(routeTitle)}
+        <div class="trails-route-subtitle">${escapeHtml(`${startName} → ${endName}`)}</div>
       </div>
 
       <div class="trails-route-stats-overlay">
@@ -910,7 +932,7 @@ function renderRoutes(list, routes) {
     
     div.addEventListener('click', (e) => {
       if (e.target.closest('.trails-fav-star') || e.target.closest('.trails-save-pin') || e.target.closest('.trails-done-btn')) return;
-      openRouteMapModal(route.id, routeLabel, route);
+      openRouteMapModal(route.id, routeTitle, route);
     });
     list.appendChild(div);
     setTimeout(() => initMiniRouteMap(minimapId, route.id), 50);
@@ -1432,7 +1454,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
       if (!requiresAuth) return;
   
-      fetch('api/routes/check_auth.php', { credentials: 'same-origin' })
+      fetch('api/routes/session_status.php', { credentials: 'same-origin' })
       .then(r => r.json())
       .then(jwt => {
           if (!jwt || !jwt.logged_in) {
@@ -1543,92 +1565,146 @@ if (registerForm) {
 
 // --- Appended: UI JS for Trails/Favs/Share (for new features only) ---
 
-  // Favourite Functionality
-  const favBtn = document.getElementById('favouriteRouteBtn');
-  const favIcon = document.getElementById('favouriteIcon');
-  let isFavourited = false; // This will be determined by backend/user state later
-  if (favBtn) {
-      favBtn.addEventListener('click', function() {
-          const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
-          if (!routeId) return alert("Route ID missing.");
-          fetch('api/routes/favourite.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-              body: 'route_id=' + encodeURIComponent(routeId)
-          })
-          .then(res => res.json())
-          .then(data => {
-              if (data.success) {
-                  isFavourited = data.action === 'added';
-                  showUnlockedAchievements(data);
-                  favIcon.textContent = isFavourited ? '★' : '☆';
-                  favIcon.style.color = isFavourited ? '#ffc300' : '#ea5f94';
-                  favBtn.classList.toggle('favourited', isFavourited);
-              } else {
-                  alert('Favourite error: ' + (data.error || 'Unknown error'));
-              }
-          }).catch(() => alert('Cannot contact server.'));
-      });
+  // ===============================
+// Route Name Modal (Favourite/Publish)
+// ===============================
+const routeNameModal  = document.getElementById('routeNameModal');
+const routeNameInput  = document.getElementById('routeNameInput');
+const routeNameSave   = document.getElementById('routeNameSave');
+const routeNameCancel = document.getElementById('routeNameCancel');
+const routeNameClose  = document.getElementById('routeNameClose');
+
+const favBtn  = document.getElementById('favouriteRouteBtn');
+const favIcon = document.getElementById('favouriteIcon');
+const publishBtn = document.getElementById('shareRouteBtn');
+
+if (!routeNameModal || !routeNameInput) {
+  console.error('Route name modal elements missing from DOM');
+  return;
+}
+
+function resetButton(id) {
+  const btn = document.getElementById(id);
+  if (!btn || !btn.parentNode) return null;
+  const clone = btn.cloneNode(true); // clones HTML but NOT listeners ✅
+  btn.parentNode.replaceChild(clone, btn);
+  return clone;
+}
+
+
+let pendingAction = null;
+
+function getDefaultRouteLabel() {
+  const isAreaMode = document.getElementById('mode_area')?.checked === true;
+
+  if (isAreaMode) {
+    const area = (window.lastAreaDisplayName || document.getElementById('area')?.value || '').trim();
+    return area ? `${area} → Loop` : `Area → Loop`;
   }
-  // Share Functionality
-  const shareBtn = document.getElementById('shareRouteBtn');
-  const shareModal = document.getElementById('shareModal');
-  const closeShareModal = document.getElementById('closeShareModal');
-  const shareLink = document.getElementById('shareLink');
-  const copyShareLink = document.getElementById('copyShareLink');
-  if (shareBtn) {
-    shareBtn.addEventListener('click', function() {
-      const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
-      if (!routeId) {
-        alert("Please select a route first (so it can be saved), then publish.");
-        return;
+
+  const start = (window.lastStartDisplayName || document.getElementById('start')?.value || '').trim();
+  const end   = (window.lastEndDisplayName   || document.getElementById('end')?.value   || '').trim();
+
+  const startLabel = start || 'Start';
+  const endLabel   = end ? end : 'Loop';
+  return `${startLabel} → ${endLabel}`;
+}
+
+
+function openRouteNameModal(action) {
+  const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
+  if (!routeId) {
+    alert("Please select a route first (so it can be saved).");
+    return;
+  }
+
+  pendingAction = action;
+
+  // dynamic copy
+  const titleEl = document.getElementById('routeNameTitle');
+  const descEl  = document.getElementById('routeNameDesc');
+  const hintEl  = document.getElementById('routeNameHint');
+
+  if (action === 'publish') {
+    if (titleEl) titleEl.textContent = 'Publish route';
+    if (descEl)  descEl.textContent  = 'Add an optional title for the public list.';
+    if (hintEl)  hintEl.innerHTML    = `Leave empty to publish as <b>${escapeHtml(getDefaultRouteLabel())}</b>.`;
+  } else {
+    if (titleEl) titleEl.textContent = 'Add to favourites';
+    if (descEl)  descEl.textContent  = 'Add an optional title so you can recognize it later.';
+    if (hintEl)  hintEl.innerHTML    = `Leave empty to save as <b>${escapeHtml(getDefaultRouteLabel())}</b>.`;
+  }
+
+  // optional: prefill with default label (you can comment this out if you prefer empty)
+  routeNameInput.value = ''; // keep empty by default
+
+  routeNameModal.style.display = 'flex';
+  setTimeout(() => routeNameInput.focus(), 0);
+}
+
+function closeRouteNameModal() {
+  routeNameModal.style.display = 'none';
+  pendingAction = null;
+}
+
+// open modal instead of instantly favouriting/publishing
+favBtn?.addEventListener('click', () => openRouteNameModal('favourite'));
+publishBtn?.addEventListener('click', () => openRouteNameModal('publish'));
+
+// SAVE -> allow empty; fallback to Start→End label
+routeNameSave?.addEventListener('click', async () => {
+  const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
+  const action = pendingAction; // snapshot so it can't become null mid-flight
+
+  const typed = routeNameInput.value.trim().slice(0, 80);
+  const route_name = typed || getDefaultRouteLabel();
+
+  if (!routeId) return alert("Route ID missing.");
+  if (!action) return alert("Action missing (bug).");
+
+  routeNameSave.disabled = true;
+
+  try {
+    const res = await fetch('api/routes/route_update.php', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ route_id: routeId, action, route_name })
+    });
+
+    const raw = await res.text();
+    let data = null;
+    try { data = JSON.parse(raw); } catch {}
+
+    if (!res.ok || !data?.success) {
+      console.error('route_update.php failed:', res.status, raw);
+      alert(data?.error || `Failed: ${res.status}`);
+      return;
+    }
+
+    // UI feedback (NULL SAFE)
+    if (action === 'favourite') {
+      if (favIcon) {
+        favIcon.textContent = '★';
+        favIcon.style.color = '#ffc300';
       }
-  
-      fetch('api/routes/share.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'route_id=' + encodeURIComponent(routeId)
-      })
-      .then(res => res.json())
-      .then(data => {
-  
-        if (!data.success) {
-          if (data.retry_after_seconds) {
-            const mins = Math.ceil(data.retry_after_seconds / 60);
-            const secs = data.retry_after_seconds % 60;
-            alert(`⏳ You can publish again in ${mins} min ${secs}s.`);
-          } else {
-            alert('Share error: ' + (data.error || 'Unknown error'));
-          }
-          return;
-        }
-  
-        alert('✅ Route shared successfully');
-      })
-      .catch(() => alert('Cannot contact server.'));
-    });  
+      if (favBtn) favBtn.classList.add('favourited');
+    } else if (action === 'publish') {
+      if (publishBtn) publishBtn.classList.add('published');
+      alert('✅ Route published successfully');
+    }
+
+    closeRouteNameModal();
+  } catch (err) {
+    console.error(err);
+    alert('Request crashed (see console).');
+  } finally {
+    routeNameSave.disabled = false;
   }
-  if (closeShareModal) {
-      closeShareModal.addEventListener('click', function() {
-          shareModal.style.display = 'none';
-      });
-  }
-  if (copyShareLink) {
-      copyShareLink.addEventListener('click', function() {
-          shareLink.select();
-          document.execCommand('copy');
-          copyShareLink.textContent = 'Copied!';
-          setTimeout(() => {
-              copyShareLink.textContent = 'Copy';
-          }, 1100);
-      });
-  }
-  // Hide modal on outside click
-  if (shareModal) {
-      shareModal.addEventListener('click', function(e) {
-          if (e.target === shareModal) shareModal.style.display = 'none';
-      });
-  }
+});
+
+
+
 
   // Filters
   document.getElementById('applyFilters')?.addEventListener('click', function() {

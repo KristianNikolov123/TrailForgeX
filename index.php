@@ -1,5 +1,7 @@
 <?php
-include 'includes/navbar.php';
+require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/navbar.php';
+$is_logged_in = !empty($_SESSION['user_id']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -14,7 +16,13 @@ include 'includes/navbar.php';
         <div class="hero-overlay"></div>
         <h1><span class="hero-icon">&#x1f3d4;&#xfe0f;</span> Discover &amp; Forge New Trails</h1>
         <p>Join TrailForgeX to explore, track, and share your trail adventures.</p>
-        <a href="generate.php" class="cta-button">Get Started</a>
+        <a
+            href="<?= $is_logged_in ? 'generate.php' : '#' ?>"
+            <?= $is_logged_in ? '' : 'onclick="document.getElementById(\'loginModal\').style.display=\'flex\';"' ?>
+            class="cta-button"
+            >
+            <?= $is_logged_in ? 'Get Started' : 'Log in / Sign up' ?>
+        </a>
     </section>
 
     <section class="hero-stats">

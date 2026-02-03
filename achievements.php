@@ -1,16 +1,10 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
-session_start();
-if (!isset($_SESSION['user_id'])) {
-  header('Location: index.php');
-  exit;
-}
+$AUTH_PAGE_NAME = 'the achievements';
+require_once __DIR__ . '/includes/auth_guard.php';
+require_once __DIR__ . '/includes/dbconn.php';
 
-require_once 'includes/dbconn.php';
-require_once 'includes/pagination.php';
+require_once __DIR__ . '/includes/pagination.php';
 
 $user_id = (int)$_SESSION['user_id'];
 
