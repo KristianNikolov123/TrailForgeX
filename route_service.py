@@ -218,30 +218,31 @@ def mark_green_edges(G, green_union):
         except Exception:
             d["_green"] = 0.0
 
-
-def pick_start_node(G, center_lat: float, center_lng: float, prefer: str, green_union):
-    """
-    In green mode, start inside a green polygon if possible, otherwise near center.
-    Also randomizes the chosen node a bit so routes aren't identical.
-    """
-    # default: near the center
+def pick_start_node(G, center_lat: float, center_lng: float, prefer: str, green_union, max_green_offset_m: int = 300):
     fallback = ox.nearest_nodes(G, center_lng, center_lat)
 
+    # If not green, just use the real start
     if prefer != "green" or green_union is None:
-        # small randomization around center node
         return fallback
+
+    # Collect ONLY green nodes close to the fallback node
+    fx, fy = G.nodes[fallback]["x"], G.nodes[fallback]["y"]
 
     green_nodes = []
-    try:
-        for n, nd in G.nodes(data=True):
-            try:
-                if Point(nd["x"], nd["y"]).within(green_union):
+    for n, nd in G.nodes(data=True):
+        try:
+            if Point(nd["x"], nd["y"]).within(green_union):
+                # quick distance in meters-ish (works ok locally)
+                dx = (nd["x"] - fx)
+                dy = (nd["y"] - fy)
+                # very rough meters conversion (good enough for small radius)
+                approx_m = (dx*111000)**2 + (dy*111000)**2
+                if approx_m <= (max_green_offset_m**2):
                     green_nodes.append(n)
-            except Exception:
-                continue
-    except Exception:
-        return fallback
+        except Exception:
+            continue
 
+    # If no green nodes nearby, start at the true start
     if not green_nodes:
         return fallback
 
@@ -398,6 +399,68 @@ def build_loop_candidates(G, start_node: int, target_m: float, count: int = 3):
     return out
 
 
+def build_point_to_point_candidates(G, start_node: int, end_node: int, target_m: float, count: int = 3):
+    """
+    Build up to `count` point-to-point routes.
+    Strategy:
+      1) base shortest path start->end
+      2) if too short vs target, add waypoint detours and re-route
+    """
+    out = []
+
+    try:
+        base = nx.shortest_path(G, start_node, end_node, weight="weight")
+        base_len = route_length_m(G, base)
+        out.append((base, base_len))
+    except Exception:
+        return out
+
+    # If base already near target, return it (and maybe slight variants)
+    if base_len >= 0.80 * target_m:
+        return out[:count]
+
+    # Need detours: pick waypoint nodes that are "off to the side"
+    try:
+        dists_from_start = nx.single_source_dijkstra_path_length(G, start_node, weight="weight")
+    except Exception:
+        return out[:count]
+
+    # look for nodes around ~40–70% of target from start (gives room for detour)
+    lo = target_m * 0.35
+    hi = target_m * 0.70
+    candidates = [n for n, dd in dists_from_start.items() if lo <= dd <= hi]
+    random.shuffle(candidates)
+
+    tries = 0
+    max_tries = 1200
+
+    used_paths = set()
+
+    while candidates and len(out) < count and tries < max_tries:
+        tries += 1
+        wp = candidates.pop()
+
+        try:
+            p1 = nx.shortest_path(G, start_node, wp, weight="weight")
+            p2 = nx.shortest_path(G, wp, end_node, weight="weight")
+        except Exception:
+            continue
+
+        full = p1 + p2[1:]
+        key = tuple(full[:50])  # cheap dedupe
+        if key in used_paths:
+            continue
+        used_paths.add(key)
+
+        length_m = route_length_m(G, full)
+
+        # Accept if within a sane window of target
+        if 0.65 * target_m <= length_m <= 1.55 * target_m:
+            out.append((full, length_m))
+
+    return out[:count]
+
+
 # ----------------------------
 # /generate3 (returns 3 routes, pick best by elevation)
 # ----------------------------
@@ -439,17 +502,25 @@ def generate3(req: Generate3Request):
     start_node = pick_start_node(G, center_lat, center_lng, req.prefer, green_union)
 
 
-    loops = build_loop_candidates(G, start_node, target_m, count=req.n_routes)
+    if req.mode == "point_to_point":
+        if req.end_lat is None or req.end_lng is None:
+            return {"success": False, "error": "end_lat/end_lng required for point_to_point", "routes": []}
 
-    if not loops:
-        return {"success": False, "error": "Could not build loop candidates in this area. Try different distance or center.", "routes": []}
+        end_node = ox.nearest_nodes(G, req.end_lng, req.end_lat)
+
+        candidates = build_point_to_point_candidates(G, start_node, end_node, target_m, count=req.n_routes)
+    else:
+        candidates = build_loop_candidates(G, start_node, target_m, count=req.n_routes)
+
+    if not candidates:
+        return {"success": False, "error": "Could not build route candidates. Try different distance/points.", "routes": []}
 
     routes_out = []
     best_idx = 0
     best_elev = -1
 
     # Elevation for each candidate (<=3 API calls)
-    for i, (nodes, length_m) in enumerate(loops):
+    for i, (nodes, length_m) in enumerate(candidates):
         coords = [(G.nodes[n]["y"], G.nodes[n]["x"]) for n in nodes]
         elev = elevation_gain(coords)
 
@@ -472,18 +543,18 @@ def generate3(req: Generate3Request):
 # ----------------------------
 @app.post("/generate")
 def generate(req: RouteRequest):
-    # use start as center for loop
-    if req.end_lat is not None and req.end_lng is not None:
-        return {"error": "Point-to-point not supported in this simplified generator. Leave End empty for a loop."}
+    mode = "point_to_point" if (req.end_lat is not None and req.end_lng is not None) else "loop_from_start"
 
     g3 = Generate3Request(
         distance_km=req.distance_km,
         elevation_gain_target=req.elevation_gain_target,
         prefer=req.prefer,
         n_routes=3,
-        center_lat=req.start_lat,
-        center_lng=req.start_lng,
-        mode="loop_in_area"
+        start_lat=req.start_lat,
+        start_lng=req.start_lng,
+        end_lat=req.end_lat,
+        end_lng=req.end_lng,
+        mode=mode
     )
 
     data = generate3(g3)
@@ -492,3 +563,4 @@ def generate(req: RouteRequest):
 
     best = data["routes"][data["best_index"]]
     return best
+

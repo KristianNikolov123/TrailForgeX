@@ -330,6 +330,22 @@ function displayRoute(route) {
   }
 }
 
+function shortPlaceName(full) {
+  full = String(full || '').trim();
+  if (!full) return '';
+
+  // Split by commas: "Street 7, City, Country..."
+  const parts = full.split(',').map(s => s.trim()).filter(Boolean);
+
+  // If it looks like a full address, keep first 1–2 parts
+  // e.g. "ul. Rayko Alexiev 7, Sofia"
+  if (parts.length >= 2) return parts.slice(0, 2).join(', ');
+
+  // Fallback
+  return parts[0];
+}
+
+
 // =============================================
 // Generate Route (TOP 3 options, start OR area)
 // =============================================
@@ -389,7 +405,7 @@ genForm.addEventListener('submit', async function(e) {
           if (el) el.textContent = 'Found: ' + startLocation.display_name;
         }
       }
-      window.lastStartDisplayName = startLocation?.display_name || startQuery;
+      window.lastStartDisplayName = shortPlaceName(startLocation?.display_name || startQuery);
 
       if (!startLocation) throw new Error('Could not find start location');
 
@@ -411,7 +427,7 @@ genForm.addEventListener('submit', async function(e) {
             if (el) el.textContent = 'Found: ' + endLocation.display_name;
           }
         }
-        window.lastEndDisplayName = endLocation?.display_name || endQuery;
+        window.lastEndDisplayName = shortPlaceName(endLocation?.display_name || endQuery);
 
 
         if (endLocation) {
@@ -445,7 +461,7 @@ genForm.addEventListener('submit', async function(e) {
           if (el) el.textContent = 'Found: ' + center.display_name;
         }
       }
-      window.lastAreaDisplayName = center?.display_name || areaQuery;
+      window.lastAreaDisplayName = shortPlaceName(center?.display_name || areaQuery);
 
       if (!center) throw new Error('Could not find that area');
 
@@ -739,6 +755,21 @@ setTimeout(() => displayRoute(r), 120);
 routeResult?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+function getDefaultRouteLabel() {
+  const isAreaMode = document.getElementById('mode_area')?.checked === true;
+
+  if (isAreaMode) {
+    const area = (window.lastAreaDisplayName || document.getElementById('area')?.value || '').trim();
+    return area ? `${area} → Loop` : `Area → Loop`;
+  }
+
+  const start = (window.lastStartDisplayName || document.getElementById('start')?.value || '').trim();
+  const end   = (window.lastEndDisplayName   || document.getElementById('end')?.value   || '').trim();
+
+  const startLabel = start || 'Start';
+  const endLabel   = end ? end : 'Loop';
+  return `${startLabel} → ${endLabel}`;
+}
 
 const favBtn = document.getElementById('favouriteRouteBtn');
 const favIcon = document.getElementById('favouriteIcon');
@@ -1444,6 +1475,7 @@ window.toggleFavourite = async function(routeId, starEl){
 // --- AJAX Login Handler (and Register Handler) ---
 document.addEventListener('DOMContentLoaded', function() {
   // Debug for script load
+  
   console.log('main.js running!');
 
   const initial = document.querySelector('.trails-tab.active')?.getAttribute('data-tab') || 'favourites';
@@ -1571,145 +1603,130 @@ if (registerForm) {
 
 // --- Appended: UI JS for Trails/Favs/Share (for new features only) ---
 
-  // ===============================
+// ===============================
 // Route Name Modal (Favourite/Publish)
 // ===============================
-const routeNameModal  = document.getElementById('routeNameModal');
-const routeNameInput  = document.getElementById('routeNameInput');
-const routeNameSave   = document.getElementById('routeNameSave');
-const routeNameCancel = document.getElementById('routeNameCancel');
-const routeNameClose  = document.getElementById('routeNameClose');
+(function initRouteNameModal(){
+  const routeNameModal  = document.getElementById('routeNameModal');
+  const routeNameInput  = document.getElementById('routeNameInput');
+  const routeNameSave   = document.getElementById('routeNameSave');
+  const routeNameCancel = document.getElementById('routeNameCancel');
+  const routeNameClose  = document.getElementById('routeNameClose');
 
-const favBtn  = document.getElementById('favouriteRouteBtn');
-const favIcon = document.getElementById('favouriteIcon');
-const publishBtn = document.getElementById('shareRouteBtn');
+  const favBtn  = document.getElementById('favouriteRouteBtn');
+  const favIcon = document.getElementById('favouriteIcon');
+  const publishBtn = document.getElementById('shareRouteBtn');
 
-if (!routeNameModal || !routeNameInput) {
-  console.error('Route name modal elements missing from DOM');
-  return;
-}
-
-function resetButton(id) {
-  const btn = document.getElementById(id);
-  if (!btn || !btn.parentNode) return null;
-  const clone = btn.cloneNode(true); // clones HTML but NOT listeners ✅
-  btn.parentNode.replaceChild(clone, btn);
-  return clone;
-}
-
-
-let pendingAction = null;
-
-function getDefaultRouteLabel() {
-  const isAreaMode = document.getElementById('mode_area')?.checked === true;
-
-  if (isAreaMode) {
-    const area = (window.lastAreaDisplayName || document.getElementById('area')?.value || '').trim();
-    return area ? `${area} → Loop` : `Area → Loop`;
-  }
-
-  const start = (window.lastStartDisplayName || document.getElementById('start')?.value || '').trim();
-  const end   = (window.lastEndDisplayName   || document.getElementById('end')?.value   || '').trim();
-
-  const startLabel = start || 'Start';
-  const endLabel   = end ? end : 'Loop';
-  return `${startLabel} → ${endLabel}`;
-}
-
-
-function openRouteNameModal(action) {
-  const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
-  if (!routeId) {
-    alert("Please select a route first (so it can be saved).");
+  // ✅ If modal isn't on this page, just skip init (NO return from main.js)
+  if (!routeNameModal || !routeNameInput || !routeNameSave) {
+    console.log('[routeNameModal] not present on this page, skipping init');
     return;
   }
 
-  pendingAction = action;
+  let pendingAction = null;
 
-  // dynamic copy
-  const titleEl = document.getElementById('routeNameTitle');
-  const descEl  = document.getElementById('routeNameDesc');
-  const hintEl  = document.getElementById('routeNameHint');
-
-  if (action === 'publish') {
-    if (titleEl) titleEl.textContent = 'Publish route';
-    if (descEl)  descEl.textContent  = 'Add an optional title for the public list.';
-    if (hintEl)  hintEl.innerHTML    = `Leave empty to publish as <b>${escapeHtml(getDefaultRouteLabel())}</b>.`;
-  } else {
-    if (titleEl) titleEl.textContent = 'Add to favourites';
-    if (descEl)  descEl.textContent  = 'Add an optional title so you can recognize it later.';
-    if (hintEl)  hintEl.innerHTML    = `Leave empty to save as <b>${escapeHtml(getDefaultRouteLabel())}</b>.`;
-  }
-
-  // optional: prefill with default label (you can comment this out if you prefer empty)
-  routeNameInput.value = ''; // keep empty by default
-
-  routeNameModal.style.display = 'flex';
-  setTimeout(() => routeNameInput.focus(), 0);
-}
-
-function closeRouteNameModal() {
-  routeNameModal.style.display = 'none';
-  pendingAction = null;
-}
-
-// open modal instead of instantly favouriting/publishing
-favBtn?.addEventListener('click', () => openRouteNameModal('favourite'));
-publishBtn?.addEventListener('click', () => openRouteNameModal('publish'));
-
-// SAVE -> allow empty; fallback to Start→End label
-routeNameSave?.addEventListener('click', async () => {
-  const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
-  const action = pendingAction; // snapshot so it can't become null mid-flight
-
-  const typed = routeNameInput.value.trim().slice(0, 80);
-  const route_name = typed || getDefaultRouteLabel();
-
-  if (!routeId) return alert("Route ID missing.");
-  if (!action) return alert("Action missing (bug).");
-
-  routeNameSave.disabled = true;
-
-  try {
-    const res = await fetch('api/routes/route_update.php', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ route_id: routeId, action, route_name })
-    });
-
-    const raw = await res.text();
-    let data = null;
-    try { data = JSON.parse(raw); } catch {}
-
-    if (!res.ok || !data?.success) {
-      console.error('route_update.php failed:', res.status, raw);
-      alert(data?.error || `Failed: ${res.status}`);
+  function openRouteNameModal(action) {
+    const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
+    if (!routeId) {
+      alert("Please select a route first (so it can be saved).");
       return;
     }
 
-    // UI feedback (NULL SAFE)
-    if (action === 'favourite') {
-      if (favIcon) {
-        favIcon.textContent = '★';
-        favIcon.style.color = '#ffc300';
-      }
-      if (favBtn) favBtn.classList.add('favourited');
-    } else if (action === 'publish') {
-      if (publishBtn) publishBtn.classList.add('published');
-      alert('✅ Route published successfully');
+    pendingAction = action;
+
+    const titleEl = document.getElementById('routeNameTitle');
+    const descEl  = document.getElementById('routeNameDesc');
+    const hintEl  = document.getElementById('routeNameHint');
+
+    if (action === 'publish') {
+      if (titleEl) titleEl.textContent = 'Publish route';
+      if (descEl)  descEl.textContent  = 'Add an optional title for the public list.';
+      if (hintEl)  hintEl.innerHTML    = `Leave empty to publish as <b>${escapeHtml(getDefaultRouteLabel())}</b>.`;
+    } else {
+      if (titleEl) titleEl.textContent = 'Add to favourites';
+      if (descEl)  descEl.textContent  = 'Add an optional title so you can recognize it later.';
+      if (hintEl)  hintEl.innerHTML    = `Leave empty to save as <b>${escapeHtml(getDefaultRouteLabel())}</b>.`;
     }
 
-    closeRouteNameModal();
-  } catch (err) {
-    console.error(err);
-    alert('Request crashed (see console).');
-  } finally {
-    routeNameSave.disabled = false;
+    routeNameInput.value = '';
+    routeNameModal.style.display = 'flex';
+    setTimeout(() => routeNameInput.focus(), 0);
   }
-});
 
+  function closeRouteNameModal() {
+    routeNameModal.style.display = 'none';
+    pendingAction = null;
+  }
 
+  // Close actions (safe even if cancel/close not present)
+  routeNameCancel?.addEventListener('click', closeRouteNameModal);
+  routeNameClose?.addEventListener('click', closeRouteNameModal);
+
+  // Click outside closes (optional nice UX)
+  routeNameModal.addEventListener('click', (e) => {
+    if (e.target === routeNameModal) closeRouteNameModal();
+  });
+
+  // ESC closes
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && routeNameModal.style.display === 'flex') closeRouteNameModal();
+  });
+
+  // open modal instead of instantly favouriting/publishing
+  favBtn?.addEventListener('click', () => openRouteNameModal('favourite'));
+  publishBtn?.addEventListener('click', () => openRouteNameModal('publish'));
+
+  // SAVE -> allow empty; fallback to Start→End label
+  routeNameSave.addEventListener('click', async () => {
+    const routeId = window.currentRouteId || document.getElementById('currentRouteId')?.value;
+    const action = pendingAction;
+
+    const typed = routeNameInput.value.trim().slice(0, 80);
+    const route_name = typed || getDefaultRouteLabel();
+
+    if (!routeId) return alert("Route ID missing.");
+    if (!action) return alert("Action missing (bug).");
+
+    routeNameSave.disabled = true;
+
+    try {
+      const res = await fetch('api/routes/route_update.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ route_id: routeId, action, route_name })
+      });
+
+      const raw = await res.text();
+      let data = null;
+      try { data = JSON.parse(raw); } catch {}
+
+      if (!res.ok || !data?.success) {
+        console.error('route_update.php failed:', res.status, raw);
+        alert(data?.error || `Failed: ${res.status}`);
+        return;
+      }
+
+      if (action === 'favourite') {
+        if (favIcon) {
+          favIcon.textContent = '★';
+          favIcon.style.color = '#ffc300';
+        }
+        if (favBtn) favBtn.classList.add('favourited');
+      } else if (action === 'publish') {
+        if (publishBtn) publishBtn.classList.add('published');
+        alert('✅ Route published successfully');
+      }
+
+      closeRouteNameModal();
+    } catch (err) {
+      console.error(err);
+      alert('Request crashed (see console).');
+    } finally {
+      routeNameSave.disabled = false;
+    }
+  });
+})();
 
 
   // Filters
@@ -2316,3 +2333,294 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 })();
+
+
+/* =========================
+   RECORD PAGE (free run)
+========================= */
+(function initRecordPage(){
+  if (!window.RECORD_PAGE) return;
+
+  const gpsStatus = document.getElementById('gpsStatus');
+  const timeTxt = document.getElementById('timeTxt');
+  const distTxt = document.getElementById('distTxt');
+  const paceTxt = document.getElementById('paceTxt');
+  const startPauseBtn = document.getElementById('startPauseBtn');
+  const finishBtn = document.getElementById('finishBtn');
+  const btnRecenter = document.getElementById('btnRecenter');
+
+  const mapEl = document.getElementById('runMap');
+  if (!mapEl) return;
+
+  // --- utils ---
+  const toRad = (x) => x * Math.PI / 180;
+  function haversineM(a, b){
+    const R = 6371000;
+    const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
+    const dLat = lat2 - lat1;
+    const dLon = toRad(b.lng - a.lng);
+    const s = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+  }
+  function fmtTime(sec){
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec/60);
+    const s = sec % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  function paceText(distM, sec){
+    const km = distM / 1000;
+    if (km < 0.05 || sec < 10) return '—';
+    const secPerKm = sec / km;
+    const mm = Math.floor(secPerKm / 60);
+    const ss = Math.floor(secPerKm % 60);
+    return `${mm}:${String(ss).padStart(2,'0')} /km`;
+  }
+
+  // --- GPS Ready gate ---
+  const GPS_READY_ACC = 15;   // since you now get ±2m, we can be strict
+  const GPS_READY_STREAK = 3;
+  let gpsReady = false;
+  let gpsGoodCount = 0;
+
+  if (startPauseBtn) {
+    startPauseBtn.disabled = true;
+    startPauseBtn.textContent = 'Waiting for GPS…';
+  }
+
+  // --- map ---
+  const map = L.map('runMap', { zoomControl: false });
+  L.control.zoom({ position:'topright' }).addTo(map);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO',
+    maxZoom: 19,
+    subdomains: 'abcd'
+  }).addTo(map);
+
+  // recorded track
+  let recorded = []; // {lat,lng,t,acc}
+  let recordedLine = L.polyline([], { weight: 9, opacity: 0.95 }).addTo(map);
+
+  let userMarker = null;
+  let accuracyCircle = null;
+
+  let smooth = null;
+  let lastFix = null;
+  let totalDistM = 0;
+
+  let running = false;
+  let startedAtMs = null;
+  let pausedAtMs = null;
+  let pausedTotalMs = 0;
+
+  let watchId = null;
+
+  function elapsedSec(){
+    if (!startedAtMs) return 0;
+    const now = Date.now();
+    const base = (running ? now : pausedAtMs) - startedAtMs - pausedTotalMs;
+    return base / 1000;
+  }
+
+  function updateUI(){
+    const sec = elapsedSec();
+    timeTxt.textContent = fmtTime(sec);
+    distTxt.textContent = (totalDistM/1000).toFixed(2) + ' km';
+    paceTxt.textContent = paceText(totalDistM, sec);
+  }
+
+  setInterval(() => {
+    if (startedAtMs) updateUI();
+  }, 500);
+
+  function startWatch(){
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const rawLat = pos.coords.latitude;
+        const rawLng = pos.coords.longitude;
+        const acc = pos.coords.accuracy ?? 999;
+        const now = Date.now();
+
+        // show accuracy
+        if (gpsStatus) gpsStatus.textContent = `GPS: ±${Math.round(acc)}m`;
+
+        // GPS Ready gate before start
+        if (!startedAtMs && !gpsReady) {
+          if (acc <= GPS_READY_ACC) gpsGoodCount++;
+          else gpsGoodCount = 0;
+
+          if (startPauseBtn) {
+            startPauseBtn.textContent =
+              acc <= GPS_READY_ACC
+                ? `GPS ready in ${Math.max(0, GPS_READY_STREAK - gpsGoodCount)}…`
+                : `Waiting for GPS…`;
+          }
+
+          if (gpsGoodCount >= GPS_READY_STREAK) {
+            gpsReady = true;
+            startPauseBtn.disabled = false;
+            startPauseBtn.textContent = 'Start';
+          }
+        }
+
+        // reject terrible fixes (only affects recording)
+        const ACC_REJECT = 40;
+        if (acc > ACC_REJECT) return;
+
+        // smooth
+        if (!smooth) smooth = { lat: rawLat, lng: rawLng };
+        const alpha = 0.25;
+        smooth.lat = smooth.lat + alpha * (rawLat - smooth.lat);
+        smooth.lng = smooth.lng + alpha * (rawLng - smooth.lng);
+
+        const fix = { lat: smooth.lat, lng: smooth.lng, t: now, acc };
+
+        // marker
+        if (!userMarker) {
+          userMarker = L.circleMarker([fix.lat, fix.lng], { radius: 7 }).addTo(map);
+          map.setView([fix.lat, fix.lng], 16);
+        } else {
+          userMarker.setLatLng([fix.lat, fix.lng]);
+        }
+
+        if (!accuracyCircle) {
+          accuracyCircle = L.circle([fix.lat, fix.lng], { radius: acc, opacity: 0.15, fillOpacity: 0.08 }).addTo(map);
+        } else {
+          accuracyCircle.setLatLng([fix.lat, fix.lng]);
+          accuracyCircle.setRadius(acc);
+        }
+
+        if (!lastFix) { lastFix = fix; return; }
+
+        if (!running) { lastFix = fix; return; }
+
+        // jump sanity
+        const prev = lastFix;
+        const d = haversineM(prev, fix);
+        const dt = Math.max(0.001, (fix.t - prev.t) / 1000);
+        const speed = d / dt;
+
+        if (d > 40 || speed > 10) return;
+
+        totalDistM += d;
+        lastFix = fix;
+
+        recorded.push(fix);
+        recordedLine.setLatLngs(recorded.map(p => [p.lat, p.lng]));
+
+        updateUI();
+      },
+      (err) => {
+        console.warn('[GPS error]', err);
+        if (gpsStatus) gpsStatus.textContent = `GPS: ${err.code} ${err.message}`;
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+    );
+  }
+
+  function stopWatch(){
+    if (watchId != null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+  }
+
+  // warm up GPS immediately
+  startWatch();
+
+  btnRecenter?.addEventListener('click', () => {
+    if (!lastFix) return;
+    map.setView([lastFix.lat, lastFix.lng], Math.max(map.getZoom(), 16), { animate:true });
+  });
+
+  startPauseBtn?.addEventListener('click', () => {
+    if (!startedAtMs) {
+      if (!gpsReady) return;
+      startedAtMs = Date.now();
+      running = true;
+      startPauseBtn.textContent = 'Pause';
+      finishBtn.disabled = false;
+      return;
+    }
+
+    if (running) {
+      running = false;
+      pausedAtMs = Date.now();
+      startPauseBtn.textContent = 'Resume';
+    } else {
+      running = true;
+      pausedTotalMs += (Date.now() - pausedAtMs);
+      pausedAtMs = null;
+      startPauseBtn.textContent = 'Pause';
+    }
+  });
+
+  finishBtn?.addEventListener('click', async () => {
+    running = false;
+    const durationSec = Math.max(1, Math.round(elapsedSec()));
+    const durationMin = Math.max(1, Math.round(durationSec / 60));
+    const distanceKm = +(totalDistM / 1000).toFixed(2);
+
+    stopWatch();
+
+    const body = new URLSearchParams();
+    body.set('duration_min', String(durationMin));
+    body.set('distance_km', String(distanceKm));
+
+    try {
+      const res = await fetch('api/routes/record_done.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!data?.success) {
+        alert(data?.error || 'Failed to save.');
+        return;
+      }
+
+      window.location.href = 'trails.php';
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save (see console).');
+    }
+  });
+})();
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.querySelector('.menu-btn');
+  const dd  = document.querySelector('.menu-dropdown');
+  if (!btn || !dd) return;
+
+  function open() {
+    dd.classList.add('is-open');
+    btn.setAttribute('aria-expanded', 'true');
+  }
+  function close() {
+    dd.classList.remove('is-open');
+    btn.setAttribute('aria-expanded', 'false');
+  }
+  function toggle(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dd.classList.contains('is-open') ? close() : open();
+  }
+
+  btn.addEventListener('click', toggle);
+
+  // ✅ clicking inside dropdown should NOT close it
+  dd.addEventListener('click', (e) => e.stopPropagation());
+
+  // ✅ click anywhere else closes it
+  document.addEventListener('click', () => close());
+
+  // ✅ ESC closes
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+});
+
+

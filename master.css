@@ -3270,3 +3270,152 @@ color: #30cfd0;
   margin-left: 8px;
 }
 
+/* =========================
+   NAVBAR (TrailForgeX) — drop-in override
+   Paste at END of master.css
+========================= */
+
+/* layout */
+.app-header{
+  position: relative;
+  z-index:10000;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0.6rem 1.2rem;
+}
+
+.nav-bar{
+  display:flex;
+  align-items:center;
+  gap:1.2rem;
+}
+
+/* links: force theme + kill visited purple */
+.nav-bar a{
+  color: rgba(246,234,244,0.85);
+  text-decoration:none;
+}
+.nav-bar a:visited{
+  color: rgba(246,234,244,0.85);
+}
+.nav-bar a:hover{
+  color:#fff;
+}
+
+/* active underline */
+.nav-bar a.active{
+  color:#ea5f94;
+  position:relative;
+}
+.nav-bar a.active::after{
+  content:'';
+  position:absolute;
+  left:0;
+  bottom:-6px;
+  width:100%;
+  height:2px;
+  background:#ea5f94;
+  border-radius:2px;
+}
+
+/* record CTA */
+.nav-record{
+  font-weight:600;
+  padding:0.4rem 0.8rem;
+  border-radius:999px;
+  background:#ea5f94;
+  color:#fff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.nav-record:visited{ color:#fff; }
+.nav-record:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(234,95,148,0.35);
+}
+
+/* avatar */
+.nav-avatar{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin-left:0.6rem;
+}
+.nav-avatar img{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  object-fit:cover;
+  display:block;
+}
+
+/* menu wrapper */
+.nav-menu{
+  position:relative;
+  margin-left:0.1rem;
+}
+
+/* hamburger button */
+.menu-btn{
+  color: rgba(246,234,244,0.85);
+  background:none;
+  border:none;
+  font-size:1.3rem;
+  cursor:pointer;
+  letter-spacing:-2px;
+  padding:0.2rem 0.35rem;
+  border-radius:10px;
+}
+.menu-btn:hover{
+  background: rgba(255,255,255,0.06);
+}
+
+/* dropdown: CLICK OPEN (no hover flicker) */
+.menu-dropdown{
+  position:absolute;
+  right:0;
+  top:120%;
+  background:#1c1024;
+  border-radius:12px;
+  min-width:180px;
+  box-shadow:0 12px 30px rgba(0,0,0,0.4);
+  z-index:10000;
+  
+
+  /* hidden state */
+  opacity:0;
+  transform: translateY(-8px);
+  pointer-events:none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  padding: 6px 0;
+}
+
+/* visible state toggled by JS */
+.menu-dropdown.is-open{
+  opacity:1;
+  transform: translateY(0);
+  pointer-events:auto;
+}
+
+.menu-dropdown a{
+  display:block;
+  padding:0.7rem 1rem;
+  color:#f6eaf4;
+  text-decoration:none;
+}
+.menu-dropdown a:hover{
+  background: rgba(234,95,148,0.14);
+}
+
+.menu-dropdown hr{
+  border:none;
+  height:1px;
+  background: rgba(255,255,255,0.10);
+  margin: 6px 0;
+}
+
+/* small-screen tweaks */
+@media (max-width: 640px){
+  .nav-bar{ gap:0.7rem; }
+  .branding-text{ display:none; } /* optional: keep only icon on mobile */
+}

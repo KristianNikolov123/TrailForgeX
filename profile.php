@@ -119,6 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id === $viewer_id) {
             $updates[] = 'profile_image = ?';
             $params[]  = $publicPath;
             $types    .= 's';
+            $_SESSION['profile_image'] = $publicPath;
+
         }
     }
 
