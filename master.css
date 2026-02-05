@@ -3078,3 +3078,195 @@ color: #30cfd0;
     margin-top: 0.15rem;
   }
   
+  .trails-run-btn{
+    position:absolute;
+    right:12px;
+    bottom:12px;
+  
+    width:38px;
+    height:38px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  
+    background:#ea5f94;
+    color:#fff;
+    border-radius:14px;
+    text-decoration:none;
+    box-shadow:0 10px 28px rgba(234,95,148,.35);
+    font-size:18px;
+    z-index:5;
+  }
+  
+  .trails-run-btn:hover{ transform: translateY(-1px); }
+  .trails-run-btn:active{ transform: translateY(0px); }
+
+
+/* =========================
+   RUN PAGE (Leaflet + overlay)
+========================= */
+/* =========================
+   RUN PAGE - Google Maps-ish hiking UI
+========================= */
+
+.run-wrap{
+  position: relative;
+  height: calc(100vh - 70px);
+  overflow: hidden;
+  border-radius: 0;
+}
+#runMap{ position:absolute; inset:0; }
+
+/* Overlay layer */
+.run-ui{
+  position:absolute;
+  inset:0;
+  z-index:1000;
+  pointer-events:none;
+}
+
+/* Top compact "Google Maps" pill */
+.run-top-pill{
+  pointer-events:auto;
+  position:absolute;
+  top:14px; left:14px;
+  padding:10px 12px;
+  max-width: min(520px, calc(100vw - 28px));
+  border-radius:18px;
+
+  background: rgba(18, 18, 22, 0.78);
+  backdrop-filter: blur(10px);
+  color:#fff;
+  box-shadow: 0 10px 34px rgba(0,0,0,.35);
+}
+
+.run-title{
+  font-weight:900;
+  font-size:14px;
+  line-height:1.15;
+  letter-spacing:.2px;
+}
+.run-gps{
+  margin-top:4px;
+  font-size:12px;
+  opacity:.85;
+}
+
+/* optional completed pill (small, google-ish) */
+.run-complete{
+  margin-top:8px;
+  display:inline-flex;
+  gap:8px;
+  align-items:center;
+  padding:7px 10px;
+  border-radius:999px;
+  font-weight:800;
+  font-size:12px;
+  color:#d6ffe4;
+  background: rgba(0, 180, 90, .18);
+  border: 1px solid rgba(0, 180, 90, .35);
+}
+
+/* Right floating: only 1 recenter button (google-ish) */
+.run-right{
+  pointer-events:auto;
+  position:absolute;
+  right:14px;
+  bottom:180px;     /* sits above the sheet */
+  z-index:1001;
+}
+
+.run-fab{
+  width:54px; height:54px;
+  border-radius:999px;
+  border:none;
+  background: rgba(18,18,22,.8);
+  backdrop-filter: blur(10px);
+  color:#fff;
+  font-size:20px;
+  cursor:pointer;
+  box-shadow: 0 14px 40px rgba(0,0,0,.35);
+}
+
+/* Bottom sheet (google maps style) */
+.run-bottom{
+  pointer-events:auto;
+  position:absolute;
+  left:0; right:0; bottom:0;
+  z-index:1000;
+
+  padding:14px 14px 18px;
+  background: rgba(10,10,14,.86);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 -22px 70px rgba(0,0,0,.55);
+
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+/* stats row like Google: compact cards */
+.run-stats{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.stat{
+  text-align:center;
+  border-radius:16px;
+  padding:12px 10px;
+
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.stat-label{
+  font-size:11px;
+  opacity:.75;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+.stat-value{
+  margin-top:6px;
+  font-size:22px;
+  font-weight:950;
+  color:#fff;
+}
+
+/* big buttons like Google Maps */
+.run-actions{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:10px;
+}
+
+.run-btn{
+  border:none;
+  border-radius:16px;
+  padding:14px 12px;
+  font-weight:900;
+  cursor:pointer;
+  font-size:16px;
+}
+
+.run-primary{
+  background: linear-gradient(90deg, #16a34a, #22c55e); /* “hiking/climb” green */
+  color:#07130b;
+}
+
+.run-secondary{
+  background: rgba(255,255,255,.10);
+  color:#fff;
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.run-btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+/* Push Leaflet controls down so they don't overlap your top pill */
+.leaflet-top.leaflet-left{
+  margin-top: 88px;   /* adjust if needed */
+  margin-left: 8px;
+}
+

@@ -916,10 +916,11 @@ function renderRoutes(list, routes) {
         <span>⬆ ${route.elevation_gain_m} m</span>
       </div>
 
-      ${isSaved ? `
-        <span class="trails-done-btn" data-route-id="${route.id}" tabindex="0" title="Mark as done">✅</span>
-      ` : ''}
 
+      <!--- ${isSaved ? `
+         <span class="trails-done-btn" data-route-id="${route.id}" tabindex="0" title="Mark as done">✅</span>
+      ` : ''}
+      -->
       <span class="trails-fav-star" data-route-id="${route.id}" tabindex="0" style="opacity:${isFav ? 1 : 0.35};">
         ${isFav ? '★' : '☆'}
       </span>
@@ -928,10 +929,15 @@ function renderRoutes(list, routes) {
           style="opacity:${isSaved ? 1 : 0.35};">
           ${isSaved ? '📌' : '📍'}
       </span>
+
+      <a class="trails-run-btn" href="run.php?route_id=${route.id}" title="Run this route" aria-label="Run this route">
+        🏃
+      </a>
+
     `;
     
     div.addEventListener('click', (e) => {
-      if (e.target.closest('.trails-fav-star') || e.target.closest('.trails-save-pin') || e.target.closest('.trails-done-btn')) return;
+      if (e.target.closest('.trails-fav-star') || e.target.closest('.trails-save-pin') || e.target.closest('.trails-done-btn') || e.target.closest('.trails-run-btn')) return;
       openRouteMapModal(route.id, routeTitle, route);
     });
     list.appendChild(div);
@@ -1790,57 +1796,57 @@ function initAchievementsPage() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAchModal(); });
 }
 
-function attachTrailsDoneHandler() {
-  const trailsList = document.getElementById('trailsList');
-  if (!trailsList) return;
+// function attachTrailsDoneHandler() {
+//   const trailsList = document.getElementById('trailsList');
+//   if (!trailsList) return;
 
-  if (trailsList._doneHandlerAttached) return;
-  trailsList._doneHandlerAttached = true;
+//   if (trailsList._doneHandlerAttached) return;
+//   trailsList._doneHandlerAttached = true;
 
-  trailsList.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.trails-done-btn');
-    if (!btn) return;
+//   trailsList.addEventListener('click', async (e) => {
+//     const btn = e.target.closest('.trails-done-btn');
+//     if (!btn) return;
 
-    e.preventDefault();
-    e.stopPropagation();
+//     e.preventDefault();
+//     e.stopPropagation();
 
-    const routeId = btn.getAttribute('data-route-id');
-    if (!routeId) return;
+//     const routeId = btn.getAttribute('data-route-id');
+//     if (!routeId) return;
 
-    // optional: ask duration
-    const duration = prompt('How many minutes did it take? (optional)', '30');
-    const durationMin = Math.max(0, parseInt(duration || '0', 10) || 0);
+//     // optional: ask duration
+//     const duration = prompt('How many minutes did it take? (optional)', '30');
+//     const durationMin = Math.max(0, parseInt(duration || '0', 10) || 0);
 
-    try {
-      const res = await fetch('api/routes/mark_done.php', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'route_id=' + encodeURIComponent(routeId) + '&duration_min=' + encodeURIComponent(durationMin)
-      });
+//     try {
+//       const res = await fetch('api/routes/mark_done.php', {
+//         method: 'POST',
+//         credentials: 'same-origin',
+//         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+//         body: 'route_id=' + encodeURIComponent(routeId) + '&duration_min=' + encodeURIComponent(durationMin)
+//       });
 
-      const raw = await res.text();
-      let data;
-      try { data = JSON.parse(raw); }
-      catch { console.error('mark_done.php non-JSON:', raw); alert('Server returned invalid response.'); return; }
+//       const raw = await res.text();
+//       let data;
+//       try { data = JSON.parse(raw); }
+//       catch { console.error('mark_done.php non-JSON:', raw); alert('Server returned invalid response.'); return; }
 
-      if (!data.success) {
-        alert(data.error || 'Failed to mark done.');
-        return;
-      }
+//       if (!data.success) {
+//         alert(data.error || 'Failed to mark done.');
+//         return;
+//       }
 
-      // toast achievements (your helper)
-      showUnlockedAchievements(data);
+//       // toast achievements (your helper)
+//       showUnlockedAchievements(data);
 
-      // refresh the active tab (so it disappears from To-Do)
-      refreshActiveTab();
+//       // refresh the active tab (so it disappears from To-Do)
+//       refreshActiveTab();
 
-    } catch (err) {
-      console.error(err);
-      alert('Failed to mark done (see console).');
-    }
-  }, true);
-}
+//     } catch (err) {
+//       console.error(err);
+//       alert('Failed to mark done (see console).');
+//     }
+//   }, true);
+// }
 
 
 function attachTrailsSaveHandler() {
@@ -1926,7 +1932,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('change', onFiltersChanged);
   });
 
-  attachTrailsDoneHandler();
+  // attachTrailsDoneHandler();
   attachTrailsStarHandler();
   attachTrailsSaveHandler();
   initAchievementsPage();
@@ -1981,3 +1987,332 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+/* =========================
+   RUN PAGE logic (run.php)
+========================= */
+(function initRunPage(){
+  if (!window.RUN_PAGE) return;
+  let smooth = null;
+
+  const { routeId, planned, title } = window.RUN_PAGE;
+
+  const mapEl = document.getElementById('runMap');
+  const gpsStatus = document.getElementById('gpsStatus');
+  const completePill = document.getElementById('completePill');
+
+  const timeTxt = document.getElementById('timeTxt');
+  const distTxt = document.getElementById('distTxt');
+  const paceTxt = document.getElementById('paceTxt');
+
+  const startPauseBtn = document.getElementById('startPauseBtn');
+  const finishBtn = document.getElementById('finishBtn');
+  const btnRecenter = document.getElementById('btnRecenter');
+
+  if (!mapEl || !Array.isArray(planned) || planned.length < 2) {
+    console.warn('[run] missing map/planned route');
+    return;
+  }
+
+  // --- utils ---
+  const toRad = (x) => x * Math.PI / 180;
+  function haversineM(a, b){
+    const R = 6371000;
+    const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
+    const dLat = lat2 - lat1;
+    const dLon = toRad(b.lng - a.lng);
+    const s = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+  }
+
+  function fmtTime(sec){
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec/60);
+    const s = sec % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function paceText(distM, sec){
+    const km = distM / 1000;
+    if (km < 0.05 || sec < 10) return '—';
+    const secPerKm = sec / km;
+    const mm = Math.floor(secPerKm / 60);
+    const ss = Math.floor(secPerKm % 60);
+    return `${mm}:${String(ss).padStart(2,'0')} /km`;
+  }
+
+  // --- map ---
+  const map = L.map('runMap', { zoomControl: true });
+
+  // Dark tiles (Google-like night feel)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO',
+    maxZoom: 19,
+    subdomains: 'abcd'
+  }).addTo(map);
+
+  // Planned route polyline (with subtle outline)
+  const plannedShadow = L.polyline(planned, { weight: 12, opacity: 0.20 }).addTo(map);
+  const plannedLine   = L.polyline(planned, { weight: 7,  opacity: 0.95 }).addTo(map);
+  map.fitBounds(plannedLine.getBounds(), { padding: [40,40], maxZoom: 17 });
+
+  const finish = planned[planned.length - 1]; // [lat,lng]
+
+  // Recorded line
+  let recorded = []; // {lat,lng,t,acc}
+  let recordedLine = L.polyline([], { weight: 9, opacity: 0.95 }).addTo(map);
+
+  // User marker (blue dot feel)
+  let userMarker = null;
+  let accuracyCircle = null;
+
+  // --- state ---
+  let running = false;
+  let startedAtMs = null;
+  let pausedAtMs = null;
+  let pausedTotalMs = 0;
+
+  let lastFix = null;
+  let totalDistM = 0;
+
+  let watchId = null;
+  // GPS Ready gate
+  const GPS_READY_ACC = 15;      
+  const GPS_READY_STREAK = 3;
+  let gpsReady = false;
+  let gpsGoodCount = 0;
+
+  // completion detection
+  let routeCompleted = false;
+  let insideFinishCount = 0;
+
+  function elapsedSec(){
+    if (!startedAtMs) return 0;
+    const now = Date.now();
+    const base = (running ? now : pausedAtMs) - startedAtMs - pausedTotalMs;
+    return base / 1000;
+  }
+
+  function updateUI(){
+    const sec = elapsedSec();
+    timeTxt.textContent = fmtTime(sec);
+    distTxt.textContent = (totalDistM/1000).toFixed(2) + ' km';
+    paceTxt.textContent = paceText(totalDistM, sec);
+  }
+
+  setInterval(() => {
+    if (startedAtMs) updateUI();
+  }, 500);
+
+  function startWatch(){
+    if (!navigator.geolocation) {
+      alert('Geolocation not supported in this browser.');
+      return;
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const rawLat = pos.coords.latitude;
+        const rawLng = pos.coords.longitude;
+        const acc = pos.coords.accuracy ?? 999;
+        const now = Date.now();
+      
+        // 1) Accuracy gate
+        const ACC_REJECT = 40; // tune 40–80
+        if (acc > ACC_REJECT) {
+          if (gpsStatus) gpsStatus.textContent = gpsReady
+          ? `GPS: ±${Math.round(acc)}m ✅`
+          : `GPS: ±${Math.round(acc)}m`;
+          // update marker *optionally* but don't record
+          if (!userMarker) userMarker = L.circleMarker([rawLat, rawLng], { radius: 7 }).addTo(map);
+          else userMarker.setLatLng([rawLat, rawLng]);
+          return;
+        }
+        // ---- GPS READY gate (only before run starts) ----
+        if (!startedAtMs && !gpsReady) {
+          if (acc <= GPS_READY_ACC) gpsGoodCount++;
+          else gpsGoodCount = 0;
+
+          if (startPauseBtn) {
+            startPauseBtn.textContent =
+              acc <= GPS_READY_ACC
+                ? `GPS ready in ${Math.max(0, GPS_READY_STREAK - gpsGoodCount)}…`
+                : `Waiting for GPS…`;
+          }
+
+          if (gpsGoodCount >= GPS_READY_STREAK) {
+            gpsReady = true;
+            if (startPauseBtn) {
+              startPauseBtn.disabled = false;
+              startPauseBtn.textContent = 'Start';
+            }
+          }
+        }
+
+        // 2) Smooth raw -> smooth
+        if (!smooth) smooth = { lat: rawLat, lng: rawLng };
+        const alpha = 0.25;
+        smooth.lat = smooth.lat + alpha * (rawLat - smooth.lat);
+        smooth.lng = smooth.lng + alpha * (rawLng - smooth.lng);
+      
+        const fix = { lat: smooth.lat, lng: smooth.lng, t: now, acc };
+      
+        // 3) Update UI/marker using SMOOTHED coords
+        if (gpsStatus) gpsStatus.textContent = `GPS: ±${Math.round(acc)}m`;
+      
+        if (!userMarker) userMarker = L.circleMarker([fix.lat, fix.lng], { radius: 7 }).addTo(map);
+        else userMarker.setLatLng([fix.lat, fix.lng]);
+      
+        if (!accuracyCircle) accuracyCircle = L.circle([fix.lat, fix.lng], { radius: acc, opacity: 0.15, fillOpacity: 0.08 }).addTo(map);
+        else {
+          accuracyCircle.setLatLng([fix.lat, fix.lng]);
+          accuracyCircle.setRadius(acc);
+        }
+      
+        // Follow on first good fix
+        if (!lastFix) {
+          lastFix = fix;
+          map.setView([fix.lat, fix.lng], Math.max(map.getZoom(), 16), { animate: true });
+          return;
+        }
+      
+        // If not running, just keep lastFix fresh (so pause doesn't create a big jump)
+        if (!running) {
+          lastFix = fix;
+          return;
+        }
+      
+        // 4) Jump/speed sanity check BEFORE recording
+        const prev = lastFix;
+        const d = haversineM(prev, fix);
+        const dt = Math.max(0.001, (fix.t - prev.t) / 1000);
+        const speed = d / dt; // m/s
+      
+        // reject teleports: >40m in one fix OR >10m/s (36km/h)
+        if (d > 40 || speed > 10) {
+          if (gpsStatus) gpsStatus.textContent = `GPS jump filtered (±${Math.round(acc)}m)`;
+          // do NOT update lastFix to fix; keep prev so we don't chain bad jumps
+          return;
+        }
+      
+        // 5) Record as good point
+        totalDistM += d;
+        lastFix = fix;
+      
+        recorded.push(fix);
+      
+        // update polyline efficiently
+        recordedLine.setLatLngs(recorded.map(p => [p.lat, p.lng]));
+      
+        // 6) completion check (uses good fix only)
+        if (!routeCompleted) {
+          const finishPt = { lat: finish[0], lng: finish[1] };
+          const df = haversineM(fix, finishPt);
+          const threshold = Math.min(50, Math.max(10, acc * 1.5));
+          insideFinishCount = (df <= threshold) ? (insideFinishCount + 1) : 0;
+      
+          if (insideFinishCount >= 3) {
+            routeCompleted = true;
+            if (completePill) completePill.style.display = 'inline-block';
+          }
+        }
+      
+        updateUI();      
+      },
+      (err) => {
+        console.warn('[GPS error]', err);
+        gpsStatus.textContent = `GPS: ${err.code} ${err.message}`;
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+
+    );
+  }
+
+  function stopWatch(){
+    if (watchId != null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+  }
+
+  // recenter button
+  btnRecenter?.addEventListener('click', () => {
+    if (!lastFix) return;
+    map.setView([lastFix.lat, lastFix.lng], Math.max(map.getZoom(), 16), { animate:true });
+  });
+
+  // start/pause/resume
+  startPauseBtn?.addEventListener('click', () => {
+    if (!startedAtMs) {
+      if (!gpsReady) return; // extra safety
+      startedAtMs = Date.now();
+      running = true;
+      startPauseBtn.textContent = 'Pause';
+      finishBtn.disabled = false;
+      return;
+    }
+
+    if (running) {
+      running = false;
+      pausedAtMs = Date.now();
+      startPauseBtn.textContent = 'Resume';
+    } else {
+      running = true;
+      pausedTotalMs += (Date.now() - pausedAtMs);
+      pausedAtMs = null;
+      startPauseBtn.textContent = 'Pause';
+    }
+  });
+
+  finishBtn?.addEventListener('click', () => endAndSave());
+
+  async function endAndSave(){
+    running = false;
+    const durationSec = Math.max(1, Math.round(elapsedSec()));
+    const durationMin = Math.max(1, Math.round(durationSec / 60));
+
+    stopWatch();
+
+    // save using your existing endpoint
+    const body = new URLSearchParams();
+    body.set('route_id', String(routeId));
+    body.set('duration_min', String(durationMin));
+
+    try {
+      const res = await fetch('api/routes/mark_done.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      });
+
+      const raw = await res.text();
+      let data;
+      try { data = JSON.parse(raw); }
+      catch { console.error('[run] mark_done non-JSON:', raw); alert('Server returned invalid response.'); return; }
+
+      if (!data.success) {
+        alert(data.error || 'Failed to save run.');
+        return;
+      }
+
+      // toast achievements if helper exists
+      if (typeof showUnlockedAchievements === 'function') {
+        showUnlockedAchievements(data);
+      }
+
+      window.location.href = 'trails.php';
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save (see console).');
+    }
+  }
+  // Warm up GPS immediately so user can start once ready
+  startWatch();
+
+  // Start button disabled until GPS ready
+  if (startPauseBtn) {
+    startPauseBtn.disabled = true;
+    startPauseBtn.textContent = 'Waiting for GPS…';
+  }
+
+})();
