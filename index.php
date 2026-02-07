@@ -17,7 +17,7 @@ $is_logged_in = !empty($_SESSION['user_id']);
         <h1><span class="hero-icon">&#x1f3d4;&#xfe0f;</span> Discover &amp; Forge New Trails</h1>
         <p>Join TrailForgeX to explore, track, and share your trail adventures.</p>
         <a
-            href="<?= $is_logged_in ? 'generate.php' : '#' ?>"
+            href="<?= $is_logged_in ? 'generate.php' : 'login_page.php' ?>"
             <?= $is_logged_in ? '' : 'onclick="document.getElementById(\'loginModal\').style.display=\'flex\';"' ?>
             class="cta-button"
             >

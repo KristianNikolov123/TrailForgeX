@@ -5,14 +5,16 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use Dotenv\Dotenv;
 
-$dotenv = Dotenv::createImmutable(dirname(__DIR__));
+$dotenv = Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
+
+
+
 
 $isHttps =
   (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
   || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
 
->>>>>>> 17c4bf7 (OAuth config via env (no secrets))
 if (session_status() === PHP_SESSION_NONE) {
   session_set_cookie_params([
     'path' => '/TrailForgeX',   // or '/' if you want it site-wide

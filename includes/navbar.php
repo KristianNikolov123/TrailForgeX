@@ -56,7 +56,8 @@ if ($is_logged_in) {
 
     <?php else: ?>
       <span class="nav-hint">Log in to unlock all features</span>
-      <a href="#" id="nav-login-btn">Log In</a>
+      <a href="login_page.php?next=<?= urlencode($current_page) ?>">Log In</a>
+      <a href="signup_page.php?next=<?= urlencode($current_page) ?>" class="nav-signup">Sign Up</a>
     <?php endif; ?>
   </nav>
 </header>
