@@ -47,19 +47,15 @@ if (!preg_match('/^[a-zA-Z0-9_\-\/]+\.php$/', $next)) $next = 'generate.php';
 
             <label class="auth-label">Confirm Password</label>
             <input type="password" id="registerConfirmPassword" class="auth-input" placeholder="Confirm your password" autocomplete="new-password" required>
+            <button type="submit" class="auth-btn">Sign Up</button>
+
+            <div class="auth-divider"><span>or</span></div>
             
             <div class="auth-oauth">
                 <a class="auth-oauth-btn google" href="auth/google_start.php?next=<?= urlencode($next) ?>">
                     Continue with Google
                 </a>
-                <a class="auth-oauth-btn facebook" href="auth/facebook_start.php?next=<?= urlencode($next) ?>">
-                    Continue with Facebook
-                </a>
-
-                <div class="auth-divider"><span>or</span></div>
             </div>
-
-            <button type="submit" class="auth-btn">Sign Up</button>
         </form>
 
         <div id="registerError" class="auth-error"></div>

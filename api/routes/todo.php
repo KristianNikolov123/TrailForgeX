@@ -24,6 +24,9 @@ $page = max(1, $page);
 $perPage = (isset($_GET['per_page']) && ctype_digit($_GET['per_page'])) ? (int)$_GET['per_page'] : 12;
 $perPage = max(1, min(50, $perPage)); // clamp 1..50
 
+$diff_min = isset($_GET['diff_min']) && $_GET['diff_min'] !== '' ? floatval($_GET['diff_min']) : null;
+$diff_max = isset($_GET['diff_max']) && $_GET['diff_max'] !== '' ? floatval($_GET['diff_max']) : null;
+
 $offset = ($page - 1) * $perPage;
 
 // ----------------------------
@@ -58,7 +61,16 @@ if (!empty($_GET['pavement_type'])) {
   $paramsBase[] = (string)$_GET['pavement_type'];
   $typesBase .= 's';
 }
-
+if ($diff_min !== null) {
+  $where[] = "(0.45 * r.distance_km + 0.018333333333 * r.elevation_gain_m) >= ?";
+  $paramsBase[] = $diff_min;
+  $typesBase .= 'd';
+}
+if ($diff_max !== null) {
+  $where[] = "(0.45 * r.distance_km + 0.018333333333 * r.elevation_gain_m) <= ?";
+  $paramsBase[] = $diff_max;
+  $typesBase .= 'd';
+}
 $whereSql = $where ? (' AND ' . implode(' AND ', $where)) : '';
 
 // ----------------------------

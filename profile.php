@@ -237,7 +237,7 @@ include 'includes/navbar.php';
         <img
           class="profile-avatar"
           src="<?= htmlspecialchars(
-            $profile_image ?: 'https://api.dicebear.com/6.x/identicon/svg?seed=' . urlencode($username)
+            $profile_image ?: 'uploads/profiles/default_avatar.png'
           ) ?>"
           alt="Profile image"
         >

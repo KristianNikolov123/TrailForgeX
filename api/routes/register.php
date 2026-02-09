@@ -21,7 +21,7 @@ if (!$username || !$email || !$password) {
 }
 
 require_once '../../includes/dbconn.php';
-if ($mysqli->connect_errno) {
+if ($connection->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'DB connection failed']);
     exit;
 }

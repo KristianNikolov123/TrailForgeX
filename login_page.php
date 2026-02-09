@@ -26,16 +26,6 @@ if (!preg_match('/^[a-zA-Z0-9_\-\/]+\.php$/', $next)) $next = 'generate.php';
             <div class="auth-tag">Log in to unlock all features</div>
         </div>
 
-        <a class="auth-oauth-btn facebook" href="/trailforgex/api/auth/facebook_start.php?next=<?= urlencode($next) ?>">
-            Continue with Facebook
-        </a>
-        <a class="auth-oauth-btn google" href="/trailforgex/api/auth/google_start.php?next=<?= urlencode($next) ?>">
-          <span class="oauth-icon">G</span>
-          Continue with Google
-        </a>
-
-        <div class="auth-divider"><span>or</span></div>
-
         <div class="auth-card">
           <div class="auth-tabs">
             <a class="auth-tab is-active" href="login_page.php?next=<?= urlencode($next) ?>">Log in</a>
@@ -53,6 +43,13 @@ if (!preg_match('/^[a-zA-Z0-9_\-\/]+\.php$/', $next)) $next = 'generate.php';
             <input type="password" id="loginPassword" class="auth-input" placeholder="••••••••" autocomplete="current-password" required>
 
             <button type="submit" class="auth-btn">Log In</button>
+            
+            <div class="auth-divider"><span>or</span></div>
+            
+            <a class="auth-oauth-btn google" href="/trailforgex/api/auth/google_start.php?next=<?= urlencode($next) ?>">
+              <span class="oauth-icon">G</span>
+              Continue with Google
+            </a>
         </form>
 
         <div id="loginError" class="auth-error"></div>

@@ -1,4 +1,5 @@
 // script.js
+window.__leafletMaps = window.__leafletMaps || {};
 
 // Example: smooth scroll for internal links
 document.querySelectorAll('a[href^=\"#\"]:not([href=\"#\"])').forEach(anchor => {
@@ -18,7 +19,7 @@ async function geocodeAddress(query) {
   }
   
   try {
-      const response = await fetch('http://localhost:8000/geocode', {
+      const response = await fetch('https://localhost:8000/geocode', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ query: query.trim() })
@@ -443,7 +444,6 @@ genForm.addEventListener('submit', async function(e) {
       payload.start_lng = startLocation.lng;
       payload.end_lat   = endLocation ? endLocation.lat : null; // null => loop
       payload.end_lng   = endLocation ? endLocation.lng : null;
-      payload.mode = endLocation ? 'point_to_point' : 'loop_from_start';
 
     } else {
       // ---------- AREA MODE (no start/end) ----------
@@ -470,13 +470,12 @@ genForm.addEventListener('submit', async function(e) {
 
       payload.center_lat = center.lat;
       payload.center_lng = center.lng;
-      payload.mode = 'loop_in_area';
     }
 
     // ✅ ONE call that returns 3 routes
     // Your backend endpoint should be /generate3 (FastAPI) or whatever you choose.
     // Change URL here if needed.
-    const resp = await fetch('http://localhost:8000/generate3', {
+    const resp = await fetch('https://localhost:8000/generate3', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -554,21 +553,39 @@ let trailsPage = {
 const PER_PAGE = 6;
 
 function getFilters() {
-return {
-  distance_min: document.getElementById('minDistance')?.value ?? '',
-  distance_max: document.getElementById('maxDistance')?.value ?? '',
-  elev_min: document.getElementById('minElevation')?.value ?? '',
-  elev_max: document.getElementById('maxElevation')?.value ?? '',
-  pavement_type: document.getElementById('pavementType')?.value ?? ''
-};
+  return {
+    distance_min: document.getElementById('minDistance')?.value ?? '',
+    distance_max: document.getElementById('maxDistance')?.value ?? '',
+    elev_min: document.getElementById('minElevation')?.value ?? '',
+    elev_max: document.getElementById('maxElevation')?.value ?? '',
+    pavement_type: document.getElementById('pavementType')?.value ?? '',
+    diff_min: document.getElementById('minDiff')?.value ?? '',
+    diff_max: document.getElementById('maxDiff')?.value ?? ''
+  };
+}
+
+function applyDifficultyFilter(routes, filters) {
+  const min = filters?.diff_min !== '' ? Number(filters.diff_min) : null;
+  const max = filters?.diff_max !== '' ? Number(filters.diff_max) : null;
+
+  if (min == null && max == null) return routes;
+
+  return routes.filter(r => {
+    const s = difficultyScore(Number(r.distance_km || 0), Number(r.elevation_gain_m || 0));
+    if (min != null && s < min) return false;
+    if (max != null && s > max) return false;
+    return true;
+  });
 }
 
 function areFiltersEmpty(filters) {
-return !String(filters.distance_min).trim()
-    && !String(filters.distance_max).trim()
-    && !String(filters.elev_min).trim()
-    && !String(filters.elev_max).trim()
-    && !String(filters.pavement_type).trim();
+  return !String(filters.distance_min).trim()
+      && !String(filters.distance_max).trim()
+      && !String(filters.elev_min).trim()
+      && !String(filters.elev_max).trim()
+      && !String(filters.pavement_type).trim()
+      && !String(filters.diff_min).trim()
+      && !String(filters.diff_max).trim();
 }
 
 function refreshActiveTab(filters = null) {
@@ -721,6 +738,57 @@ top3.forEach((r, idx) => {
 
   choicesWrap.appendChild(card);
 });
+}
+
+//------------------------------------------//
+// Difficulty Score
+//------------------------------------------//
+function difficultyScore(distanceKm, elevGainM) {
+  // Normalize: 10km ≈ 1.0, 300m gain ≈ 1.0
+  const d = distanceKm / 10;
+  const e = elevGainM / 300;
+
+  // Weighted blend (elevation matters more)
+  const raw = d * 0.45 + e * 0.55;
+
+  // Convert to 0–10, clamp
+  return Math.max(0, Math.min(10, raw * 10));
+}
+
+function difficultyLabel(score) {
+  if (score < 2.5) return { label: 'Easy', color: 'easy' };
+  if (score < 5.5) return { label: 'Moderate', color: 'moderate' };
+  if (score < 8.0) return { label: 'Hard', color: 'hard' };
+  return { label: 'Very Hard', color: 'veryhard' };
+}
+
+
+//------------------------------------------//
+// Auto Tags
+//------------------------------------------//
+
+function autoTags(route) {
+  const tags = [];
+
+  const dist = Number(route.distance_km || 0);
+  const elev = Number(route.elevation_gain_m || 0);
+
+  // distance buckets
+  if (dist < 5) tags.push('Short');
+  else if (dist < 12) tags.push('Medium');
+  else tags.push('Long');
+
+  // elevation buckets
+  if (elev < 80) tags.push('Flat');
+  else if (elev < 250) tags.push('Hilly');
+  else tags.push('Steep');
+
+  // surface (if you have it)
+  const pav = (route.pavement_type || '').toLowerCase();
+  if (pav.includes('trail') || pav.includes('dirt')) tags.push('Trail');
+  else if (pav.includes('road') || pav.includes('asphalt')) tags.push('Road');
+
+  return tags;
 }
 
 /* ------- Helpers ------- */
@@ -925,6 +993,11 @@ function renderRoutes(list, routes) {
       route.mode === 'loop_from_start' ? 'Loop' : 'End'
     );
     
+    const diffScore = difficultyScore(Number(route.distance_km), Number(route.elevation_gain_m));
+    const diffMeta  = difficultyLabel(diffScore);
+    const tags = autoTags(route);
+
+
     const routeTitle = (route.title && String(route.title).trim())
     ? String(route.title).trim()
     : `${startName} → ${endName}`;   // fallback if no title
@@ -939,7 +1012,6 @@ function renderRoutes(list, routes) {
 
       <div class="trails-route-names-overlay">
         🌄 ${escapeHtml(routeTitle)}
-        <div class="trails-route-subtitle">${escapeHtml(`${startName} → ${endName}`)}</div>
       </div>
 
       <div class="trails-route-stats-overlay">
@@ -947,6 +1019,12 @@ function renderRoutes(list, routes) {
         <span>⬆ ${route.elevation_gain_m} m</span>
       </div>
 
+      <div class="route-badges">
+        <span class="badge badge-${diffMeta.color}">
+          ${diffMeta.label} · ${diffScore.toFixed(1)}/10
+        </span>
+        ${tags.slice(0,3).map(t => `<span class="badge badge-tag">${escapeHtml(t)}</span>`).join('')}
+      </div>
 
       <!--- ${isSaved ? `
          <span class="trails-done-btn" data-route-id="${route.id}" tabindex="0" title="Mark as done">✅</span>
@@ -1159,8 +1237,6 @@ function openRouteMapModal(route_id, routeTitle, routeMeta) {
     const q = qs.toString();
     if (q) url += '?' + q;
   
-    console.log('[todo] fetching:', url);
-  
     const resp = await fetch(url, { credentials: 'same-origin' });
     const raw = await resp.text();
   
@@ -1188,8 +1264,8 @@ function openRouteMapModal(route_id, routeTitle, routeMeta) {
       if(pag) pag.innerHTML = '';
       return;
     }
-  
-    renderRoutes(list, data.routes);
+    const filtered = applyDifficultyFilter(data.routes, filters);
+    renderRoutes(list, filtered);
 
     renderPagination('trailsPagination', data.pagination, (newPage) => {
       trailsPage[currentTrailsTab] = newPage;
@@ -1238,7 +1314,8 @@ function openRouteMapModal(route_id, routeTitle, routeMeta) {
       return;
     }
   
-    renderRoutes(list, data.routes);
+    const filtered = applyDifficultyFilter(data.routes, filters);
+    renderRoutes(list, filtered);
   
     renderPagination('trailsPagination', data.pagination, (newPage) => {
       trailsPage[currentTrailsTab] = newPage;
@@ -1290,7 +1367,8 @@ async function loadFavourites(filters = {}) {
     return;
   }
 
-  renderRoutes(list, data.routes);
+  const filtered = applyDifficultyFilter(data.routes, filters);
+  renderRoutes(list, filtered);
 
   renderPagination('trailsPagination', data.pagination, (newPage) => {
     trailsPage[currentTrailsTab] = newPage;
@@ -1470,8 +1548,6 @@ window.toggleFavourite = async function(routeId, starEl){
   }
 };
 
-
-
 // --- AJAX Login Handler (and Register Handler) ---
 document.addEventListener('DOMContentLoaded', function() {
   // Debug for script load
@@ -1480,7 +1556,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const initial = document.querySelector('.trails-tab.active')?.getAttribute('data-tab') || 'favourites';
   setTrailsTab(initial);
-  refreshActiveTab(null);
+  const trailsList = document.getElementById('trailsList');
+  if (trailsList) {
+    const initial = document.querySelector('.trails-tab.active')?.getAttribute('data-tab') || 'favourites';
+    setTrailsTab(initial);
+    refreshActiveTab(null);
+  }
+
   // --- Auth guard (redirect if not logged in) ---
   (function checkAuthGuard() {
       // Only run on pages that require auth (e.g. trails.php, generate.php)
@@ -1619,7 +1701,6 @@ if (registerForm) {
 
   // ✅ If modal isn't on this page, just skip init (NO return from main.js)
   if (!routeNameModal || !routeNameInput || !routeNameSave) {
-    console.log('[routeNameModal] not present on this page, skipping init');
     return;
   }
 
@@ -1731,22 +1812,11 @@ if (registerForm) {
 
   // Filters
   document.getElementById('applyFilters')?.addEventListener('click', function() {
-    const filters = {
-      distance_min: document.getElementById('minDistance')?.value || '',
-      distance_max: document.getElementById('maxDistance')?.value || '',
-      elev_min: document.getElementById('minElevation')?.value || '',
-      elev_max: document.getElementById('maxElevation')?.value || '',
-      pavement_type: document.getElementById('pavementType')?.value || ''
-    };
-  
-    refreshActiveTab(filters);
-  });
-  
-  
-
+    refreshActiveTab(getFilters());
+  });  
 
       // Attach listeners
-      ['minDistance','maxDistance','minElevation','maxElevation','pavementType'].forEach(id => {
+      ['minDistance','maxDistance','minElevation','maxElevation','pavementType','minDiff','maxDiff'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       el.addEventListener('input', onFiltersChanged);
@@ -1868,21 +1938,14 @@ function initAchievementsPage() {
 
 function attachTrailsSaveHandler() {
   const trailsList = document.getElementById('trailsList');
-  if (!trailsList) {
-    console.warn('[save-pin] trailsList not found');
-    return;
-  }
+  if (!trailsList) return;
 
   if (trailsList._saveHandlerAttached) return;
   trailsList._saveHandlerAttached = true;
 
-  console.log('[save-pin] handler attached');
-
   trailsList.addEventListener('click', async (e) => {
     const pin = e.target.closest('.trails-save-pin');
     if (!pin) return;
-
-    console.log('[save-pin] clicked', pin.getAttribute('data-route-id'));
 
     e.preventDefault();
     e.stopPropagation();
@@ -1898,7 +1961,6 @@ function attachTrailsSaveHandler() {
     });
 
     const raw = await res.text();
-    console.log('[save-pin] response raw:', raw);
 
     let data;
     try { data = JSON.parse(raw); }
@@ -2008,12 +2070,12 @@ document.addEventListener('DOMContentLoaded', () => {
    RUN PAGE logic (run.php)
 ========================= */
 (function initRunPage(){
+
   if (!window.RUN_PAGE) return;
   let smooth = null;
 
   const { routeId, planned, title } = window.RUN_PAGE;
 
-  const mapEl = document.getElementById('runMap');
   const gpsStatus = document.getElementById('gpsStatus');
   const completePill = document.getElementById('completePill');
 
@@ -2024,11 +2086,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const startPauseBtn = document.getElementById('startPauseBtn');
   const finishBtn = document.getElementById('finishBtn');
   const btnRecenter = document.getElementById('btnRecenter');
-
-  if (!mapEl || !Array.isArray(planned) || planned.length < 2) {
-    console.warn('[run] missing map/planned route');
-    return;
-  }
 
   // --- utils ---
   const toRad = (x) => x * Math.PI / 180;
@@ -2058,14 +2115,46 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- map ---
-  const map = L.map('runMap', { zoomControl: true });
+  window.__leafletMaps = window.__leafletMaps || {};
 
-  // Dark tiles (Google-like night feel)
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap contributors © CARTO',
-    maxZoom: 19,
-    subdomains: 'abcd'
-  }).addTo(map);
+  const mapEl = document.getElementById('runMap');
+  if (!mapEl) return;
+
+  // guard
+  if (window.__leafletMaps.runMap) {
+    const map = window.__leafletMaps.runMap;
+    setTimeout(() => map.invalidateSize(true), 200);
+    return;
+  }
+
+  const map = L.map('runMap', { zoomControl: true });
+  window.__leafletMaps.runMap = map;
+
+  const carto = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap contributors © CARTO' }
+  );
+  
+  const osm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom: 19, attribution: '© OpenStreetMap contributors' }
+  );
+  
+  carto.addTo(map);
+  
+  let errs = 0;
+  carto.on('tileerror', (e) => {
+    errs++;
+    console.warn('[record] carto tileerror', e);
+    if (errs >= 3 && !map.hasLayer(osm)) {
+      console.warn('[record] switching to OSM');
+      map.removeLayer(carto);
+      osm.addTo(map);
+    }
+  });
+  
+  carto.on('tileload', () => { errs = 0; });
+  setTimeout(() => map.invalidateSize(true), 200);
 
   // Planned route polyline (with subtle outline)
   const plannedShadow = L.polyline(planned, { weight: 12, opacity: 0.20 }).addTo(map);
@@ -2143,6 +2232,12 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!userMarker) userMarker = L.circleMarker([rawLat, rawLng], { radius: 7 }).addTo(map);
           else userMarker.setLatLng([rawLat, rawLng]);
           return;
+        }
+
+        // ALWAYS show something on first fix, even if accuracy is bad
+        if (!userMarker) {
+          userMarker = L.circleMarker([rawLat, rawLng], { radius: 7 }).addTo(map);
+          map.setView([rawLat, rawLng], 16);
         }
         // ---- GPS READY gate (only before run starts) ----
         if (!startedAtMs && !gpsReady) {
@@ -2349,9 +2444,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const finishBtn = document.getElementById('finishBtn');
   const btnRecenter = document.getElementById('btnRecenter');
 
-  const mapEl = document.getElementById('runMap');
-  if (!mapEl) return;
-
   // --- utils ---
   const toRad = (x) => x * Math.PI / 180;
   function haversineM(a, b){
@@ -2389,18 +2481,65 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- map ---
-  const map = L.map('runMap', { zoomControl: false });
+
+  window.__leafletMaps = window.__leafletMaps || {};
+
+  const mapEl = document.getElementById('runMap');
+  if (!mapEl) return;
+
+  window.__leafletMaps ??= {};
+
+  if (window.__leafletMaps.recordMap) {
+    setTimeout(() => window.__leafletMaps.recordMap.invalidateSize(true), 200);
+    return;
+  }
+
+  const map = L.map('runMap', { zoomControl: true });
+  window.__leafletMaps.recordMap = map;
+
+
   L.control.zoom({ position:'topright' }).addTo(map);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap contributors © CARTO',
-    maxZoom: 19,
-    subdomains: 'abcd'
-  }).addTo(map);
+  const carto = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap contributors © CARTO' }
+  );
+  
+  const osm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom: 19, attribution: '© OpenStreetMap contributors' }
+  );
+    // give the map a starting view so tiles load instantly
+  map.setView([42.6977, 23.3219], 13); // Sofia default (pick whatever)
+  setTimeout(() => map.invalidateSize(true), 200);
 
+  carto.addTo(map);
+  
+  let errs = 0;
+  carto.on('tileerror', (e) => {
+    errs++;
+    console.warn('[record] carto tileerror', e);
+    if (errs >= 3 && !map.hasLayer(osm)) {
+      console.warn('[record] switching to OSM');
+      map.removeLayer(carto);
+      osm.addTo(map);
+    }
+  });
+  
+  carto.on('tileload', () => { errs = 0; });
+  
+
+  setTimeout(() => map.invalidateSize(true), 200);
   // recorded track
   let recorded = []; // {lat,lng,t,acc}
-  let recordedLine = L.polyline([], { weight: 9, opacity: 0.95 }).addTo(map);
+  let recordedLine = L.polyline([], {
+    color: '#ea5f94',
+    weight: 8,
+    opacity: 1,
+    lineCap: 'round',
+    lineJoin: 'round'
+  }).addTo(map);
+  
 
   let userMarker = null;
   let accuracyCircle = null;
@@ -2514,6 +2653,12 @@ document.addEventListener('DOMContentLoaded', () => {
       (err) => {
         console.warn('[GPS error]', err);
         if (gpsStatus) gpsStatus.textContent = `GPS: ${err.code} ${err.message}`;
+      
+        // ensure map still has a view so tiles render
+        if (!map._loaded) {
+          map.setView([42.6977, 23.3219], 13);
+          setTimeout(() => map.invalidateSize(true), 200);
+        }
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     );
@@ -2590,6 +2735,34 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 })();
 
+(function initPavementSelect(){
+  const wrap  = document.getElementById('pavementSelect');
+  const btn   = document.getElementById('pavementBtn');
+  const menu  = document.getElementById('pavementMenu');
+  const label = document.getElementById('pavementLabel');
+  const input = document.getElementById('pavementType'); // hidden input
+
+  if (!wrap || !btn || !menu || !label || !input) return;
+
+  btn.addEventListener('click', () => {
+    wrap.classList.toggle('open');
+  });
+
+  menu.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-value]');
+    if (!b) return;
+    const val = b.dataset.value;
+    input.value = val;
+    label.textContent = b.textContent;
+    wrap.classList.remove('open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target)) wrap.classList.remove('open');
+  });
+})();
+
+
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.querySelector('.menu-btn');
   const dd  = document.querySelector('.menu-dropdown');
@@ -2621,6 +2794,4 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') close();
   });
-});
-
-
+}); 

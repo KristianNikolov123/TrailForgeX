@@ -577,76 +577,6 @@ pointer-events: none; /* overlays won’t block clicks */
 }
 
 /* =========================
-   FILTERS
-========================= */
-
-.trails-filters-card {
-  background: linear-gradient(90deg, #221021 95%, #e67e221a 100%);
-  color: #e6bfd6;
-  padding: 1.1em;
-  border-radius: 12px;
-  margin-bottom: 1.7em;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.9em;
-  box-shadow: 0 5px 38px #ea5f9418;
-  border: 1.5px solid #321a2c;
-}
-
-.trails-filters-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8em;
-}
-
-.filter-field {
-  display: flex;
-  align-items: center;
-  background: #21131e;
-  border-radius: 8px;
-  padding: 0.3em 0.6em;
-  gap: 0.3em;
-}
-
-.filter-icon {
-  opacity: 0.65;
-}
-
-.filter-field input,
-.filter-field select {
-  background: #1c1219;
-  color: #fff;
-  border: none;
-  border-radius: 7px;
-  padding: 0.35em 0.8em;
-  font-size: 1em;
-  min-width: 65px;
-}
-
-.filter-field input:focus,
-.filter-field select:focus {
-  outline: 2px solid #ea5f94;
-  background: #2f1423;
-}
-
-.filter-apply-btn {
-  padding: 0.65em 1.5em;
-  border-radius: 8px;
-  background: linear-gradient(90deg,#ea5f94 55%,#e67e22 100%);
-  color: #fff;
-  font-size: 1em;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 2px 16px #ea5f9438;
-}
-
-.filter-apply-btn:hover {
-  transform: scale(1.04);
-}
-
-/* =========================
    TRAILS GRID
 ========================= */
 
@@ -867,10 +797,6 @@ right: 3.15em;
 /* === MODAL LOGIN POPUP RESTORED === */
 @media (max-width: 600px) {
   .trails-tabs {
-      flex-direction:column;
-      gap:0.7em;
-  }
-  .trails-filters {
       flex-direction:column;
       gap:0.7em;
   }
@@ -3526,7 +3452,6 @@ color: #30cfd0;
 }
 .auth-oauth-btn:hover{ transform: translateY(-1px); }
 .auth-oauth-btn.google{ border-color: rgba(234,95,148,0.20); }
-.auth-oauth-btn.facebook{ border-color: rgba(100,170,255,0.18); }
 
 .auth-divider{
   display:flex; align-items:center; gap:.7rem;
@@ -3582,4 +3507,226 @@ color: #30cfd0;
   }
 .auth-oauth-sep span { 
   font-size:.9rem; 
+}
+
+
+/* HARD OVERRIDE: keep Record CTA readable in all states */
+header nav ul li a.nav-record,
+header nav ul li a.nav-record:hover,
+header nav ul li a.nav-record:active,
+header nav ul li a.nav-record:focus,
+header nav ul li a.nav-record:visited,
+.nav-bar a.nav-record,
+.nav-bar a.nav-record:hover,
+.nav-bar a.nav-record:active,
+.nav-bar a.nav-record:focus,
+.nav-bar a.nav-record:visited{
+  color:#fff !important;
+}
+
+.run-wrap, .run-main {
+  height: 100vh;
+}
+
+#runMap {
+  height: 100%;
+  width: 100%;
+}
+
+/* =========================
+Route Badges
+========================= */
+
+.trails-route-card { position: relative; }
+
+.route-badges{
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 64px;          /* put it above the bottom distance/elev bar */
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  z-index: 50;
+}
+
+.badge{
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.18);
+  backdrop-filter: blur(6px);
+}
+
+.badge-tag{ opacity: 0.95; }
+
+.badge-easy{     border-color: rgba(80,255,140,0.55); }
+.badge-moderate{ border-color: rgba(255,210,80,0.60); }
+.badge-hard{     border-color: rgba(255,120,80,0.60); }
+.badge-veryhard{ border-color: rgba(255,80,170,0.65); }
+
+
+/* =========================
+   Trails Filters — clean + aligned
+   (paste near END of master.css)
+========================= */
+
+.trails-filters-card{
+  display: grid;
+  grid-template-columns: 1fr auto;  /* fields + button */
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 1rem;
+  padding: 16px;
+  border-radius: 14px;
+
+  background: linear-gradient(90deg, rgba(34,16,33,.92), rgba(34,16,33,.70));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 50px rgba(234,95,148,0.10);
+}
+
+/* 2-column fields grid */
+.trails-filters-fields{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 10px 14px;
+  min-width: 0;
+}
+
+/* each filter row as a pill */
+.filter-field{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 12px;
+  border-radius: 12px;
+
+  background: rgba(0,0,0,0.22);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+/* icon column */
+.filter-icon{
+  width: 28px;
+  display: flex;
+  justify-content: center;
+  opacity: .75;
+}
+
+/* make inputs share remaining space nicely */
+.filter-field input,
+.filter-field select{
+  flex: 1;
+  min-width: 0;
+
+  height: 40px;
+  padding: 0 12px;
+
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.18);
+
+  color: #fff;
+  font-weight: 700;
+  font-size: .95rem;
+}
+
+.filter-field input::placeholder{
+  color: rgba(255,255,255,0.45);
+  font-weight: 700;
+}
+
+/* nicer focus */
+.filter-field input:focus,
+.filter-field select:focus{
+  outline: none;
+  border-color: rgba(234,95,148,0.55);
+  box-shadow: 0 0 0 3px rgba(234,95,148,0.16);
+}
+
+/* your inline "-" separator */
+.trails-filters-card .filter-field span[style*="margin:0 3px"]{
+  opacity: .45 !important;
+  margin: 0 6px !important;
+  font-weight: 900;
+}
+
+/* Apply button: same height, aligned right */
+.filter-apply-btn{
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.filter-apply-btn:hover{
+  cursor: pointer;
+}
+
+/* responsive */
+@media (max-width: 900px){
+  .trails-filters-card{
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .trails-filters-fields{
+    grid-template-columns: 1fr;
+  }
+  .filter-apply-btn{
+    width: 100%;
+  }
+}
+
+.tf-select{ position:relative; width:100%; }
+
+.tf-select-btn{
+  width:100%;
+  height:38px;
+  border-radius: 14px;
+  padding: 0 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+
+  background: rgba(0,0,0,.22);
+  border: 1px solid rgba(255,255,255,.10);
+  color:#fff;
+  cursor:pointer;
+}
+
+.tf-select-menu{
+  position:absolute;
+  left:0; right:0;
+  top: calc(100% + 8px);
+  border-radius: 14px;
+  padding: 6px;
+  display:none;
+  z-index: 9999;
+
+  background: rgba(20,10,16,.95);
+  border: 1px solid rgba(234,95,148,.25);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.45);
+}
+
+.tf-select.open .tf-select-menu{ display:block; }
+
+.tf-select-menu button{
+  width:100%;
+  text-align:left;
+  padding: 10px 12px;
+  border:none;
+  background:transparent;
+  color:#fff;
+  border-radius: 10px;
+  cursor:pointer;
+  font-weight: 800;
+}
+
+.tf-select-menu button:hover{
+  background: rgba(234,95,148,.18);
 }

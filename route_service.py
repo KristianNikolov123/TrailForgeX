@@ -563,4 +563,3 @@ def generate(req: RouteRequest):
 
     best = data["routes"][data["best_index"]]
     return best
-

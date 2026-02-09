@@ -4,7 +4,7 @@ require_once __DIR__ . '/bootstrap.php';
 $is_logged_in = !empty($_SESSION['user_id']);
 $current_page = basename($_SERVER['PHP_SELF']);
 
-$profile_img = 'assets/default-avatar.png';
+$profile_img = 'uploads/profiles/default_avatar.png';
 
 if ($is_logged_in) {
   require_once __DIR__ . '/dbconn.php';

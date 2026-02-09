@@ -25,6 +25,9 @@ $page = max(1, $page);
 $per_page = (isset($_GET['per_page']) && ctype_digit($_GET['per_page'])) ? (int)$_GET['per_page'] : 12;
 $per_page = max(1, min(50, $per_page)); // clamp 1..50
 
+$diff_min = isset($_GET['diff_min']) && $_GET['diff_min'] !== '' ? floatval($_GET['diff_min']) : null;
+$diff_max = isset($_GET['diff_max']) && $_GET['diff_max'] !== '' ? floatval($_GET['diff_max']) : null;
+
 $offset = ($page - 1) * $per_page;
 
 /* -------------------------
@@ -58,7 +61,9 @@ if ($elev_min !== null) { $where .= " AND r.elevation_gain_m >= ?"; $types .= "i
 if ($elev_max !== null) { $where .= " AND r.elevation_gain_m <= ?"; $types .= "i"; $params[] = $elev_max; }
 
 if ($pavement !== null) { $where .= " AND r.activity_type = ?"; $types .= "s"; $params[] = $pavement; }
+if ($diff_min !== null) { $where .= " AND (0.45 * r.distance_km + 0.018333333333 * r.elevation_gain_m) >= ?"; $types .= "d"; $params[] = $diff_min; }
 
+if ($diff_max !== null) { $where .= " AND (0.45 * r.distance_km + 0.018333333333 * r.elevation_gain_m) <= ?"; $types .= "d"; $params[] = $diff_max; }
 /* -------------------------
    1) COUNT total items
 --------------------------*/
