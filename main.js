@@ -2086,7 +2086,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const startPauseBtn = document.getElementById('startPauseBtn');
   const finishBtn = document.getElementById('finishBtn');
   const btnRecenter = document.getElementById('btnRecenter');
+  const btnMinimize = document.getElementById('btnMinimize');
+  const btnExpand = document.getElementById('btnExpand');
 
+  function enterFullStats() {
+    document.body.classList.add('run-fullstats');
+    // fullscreen stats should only be used after start
+    // (but it's fine to allow it anytime if you want)
+    setTimeout(() => {
+      const m = window.__leafletMaps?.runMap || window.__leafletMaps?.recordMap;
+      if (m) m.invalidateSize(true);
+    }, 200);
+  }
+  
+  function exitFullStats() {
+    document.body.classList.remove('run-fullstats');
+    setTimeout(() => {
+      const m = window.__leafletMaps?.runMap || window.__leafletMaps?.recordMap;
+      if (m) m.invalidateSize(true);
+    }, 200);
+  }
+
+  btnMinimize?.addEventListener('click', () => exitFullStats());
+  btnExpand?.addEventListener('click', () => enterFullStats());
   // --- utils ---
   const toRad = (x) => x * Math.PI / 180;
   function haversineM(a, b){
@@ -2355,13 +2377,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // start/pause/resume
   startPauseBtn?.addEventListener('click', () => {
     if (!startedAtMs) {
-      if (!gpsReady) return; // extra safety
+      if (!gpsReady) return;
+    
+      document.body.classList.remove('run-prestart');
+      document.body.classList.add('run-started');
+    
+      enterFullStats(); // ✅
+    
       startedAtMs = Date.now();
       running = true;
       startPauseBtn.textContent = 'Pause';
       finishBtn.disabled = false;
       return;
     }
+    
 
     if (running) {
       running = false;
@@ -2376,7 +2405,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   finishBtn?.addEventListener('click', () => endAndSave());
-
+  
   async function endAndSave(){
     running = false;
     const durationSec = Math.max(1, Math.round(elapsedSec()));
@@ -2444,6 +2473,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const finishBtn = document.getElementById('finishBtn');
   const btnRecenter = document.getElementById('btnRecenter');
 
+  const btnMinimize = document.getElementById('btnMinimize');
+  const btnExpand   = document.getElementById('btnExpand');
+
+  function enterFullStats() {
+    document.body.classList.add('run-fullstats');
+    // fullscreen stats should only be used after start
+    // (but it's fine to allow it anytime if you want)
+    setTimeout(() => {
+      const m = window.__leafletMaps?.runMap || window.__leafletMaps?.recordMap;
+      if (m) m.invalidateSize(true);
+    }, 200);
+  }
+  
+  function exitFullStats() {
+    document.body.classList.remove('run-fullstats');
+    setTimeout(() => {
+      const m = window.__leafletMaps?.runMap || window.__leafletMaps?.recordMap;
+      if (m) m.invalidateSize(true);
+    }, 200);
+  }
+
+  btnMinimize?.addEventListener('click', () => exitFullStats());
+  btnExpand?.addEventListener('click', () => enterFullStats());
   // --- utils ---
   const toRad = (x) => x * Math.PI / 180;
   function haversineM(a, b){
@@ -2496,9 +2548,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const map = L.map('runMap', { zoomControl: true });
   window.__leafletMaps.recordMap = map;
-
-
-  L.control.zoom({ position:'topright' }).addTo(map);
 
   const carto = L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -2682,13 +2731,20 @@ document.addEventListener('DOMContentLoaded', () => {
   startPauseBtn?.addEventListener('click', () => {
     if (!startedAtMs) {
       if (!gpsReady) return;
+    
+      document.body.classList.remove('run-prestart');
+      document.body.classList.add('run-started');
+    
+      enterFullStats(); // ✅
+    
       startedAtMs = Date.now();
       running = true;
       startPauseBtn.textContent = 'Pause';
       finishBtn.disabled = false;
       return;
     }
-
+    
+  
     if (running) {
       running = false;
       pausedAtMs = Date.now();
@@ -2700,6 +2756,8 @@ document.addEventListener('DOMContentLoaded', () => {
       startPauseBtn.textContent = 'Pause';
     }
   });
+  
+
 
   finishBtn?.addEventListener('click', async () => {
     running = false;
@@ -2733,6 +2791,7 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Failed to save (see console).');
     }
   });
+  
 })();
 
 (function initPavementSelect(){

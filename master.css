@@ -3730,3 +3730,210 @@ Route Badges
 .tf-select-menu button:hover{
   background: rgba(234,95,148,.18);
 }
+
+/* =========================================================
+   RUN / RECORD — Strava-like Fullscreen Stats (CLEAN, NO DUPES)
+   Paste near the END of master.css
+========================================================= */
+
+/* ---------- Pre-start / started reveal ---------- */
+body.run-prestart .run-stats{
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+body.run-prestart .run-bottom{ padding-top: 0.75rem; }
+
+body.run-started .run-stats{
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* =========================================================
+   TOP BAR (map + stats) — flush to screen edges
+========================================================= */
+.run-top-pill{
+  position: relative;
+  width: 100%;
+  margin: 0;
+
+  padding: 1.15rem 1.2rem 1rem;
+
+  background: rgba(15,15,22,0.90);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+
+  border-bottom-left-radius: 22px;
+  border-bottom-right-radius: 22px;
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+
+.run-title{
+  font-size: 1.05rem;
+  font-weight: 750;
+  letter-spacing: 0.2px;
+}
+.run-gps{
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+
+/* Optional: respect notch / safe area */
+.run-top-pill{
+  padding-top: calc(1.15rem + env(safe-area-inset-top));
+}
+
+/* ---------- Expand/Minimize buttons (same style) ---------- */
+.run-min-btn,
+.run-expand-btn{
+  position: absolute;
+  top: 0.75rem;
+  right: 0.8rem;
+
+  width: 44px;
+  height: 44px;
+  padding: 0;
+
+  place-items: center;
+  border-radius: 999px;
+
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.10);
+  color: #fff;
+  cursor: pointer;
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  transition: transform 120ms ease, background 120ms ease;
+}
+.run-min-btn:active,
+.run-expand-btn:active{
+  transform: scale(0.96);
+  background: rgba(255,255,255,0.14);
+}
+
+/* show ONLY the correct one */
+.run-min-btn{ display: none; }
+.run-expand-btn{ display: none; }
+body.run-fullstats .run-min-btn{ display: inline-grid; }
+body:not(.run-fullstats) .run-expand-btn{ display: inline-grid; }
+
+/* =========================================================
+   FULLSCREEN STATS MODE
+========================================================= */
+body.run-fullstats #runMap{ display: none !important; }
+
+body.run-fullstats .run-ui{
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+
+  background:
+    radial-gradient(1200px 700px at 50% -20%, rgba(255,255,255,0.08), transparent 55%),
+    radial-gradient(900px 600px at 10% 40%, rgba(234,95,148,0.10), transparent 60%),
+    #0b0b10 !important;
+}
+
+/* Hide recenter in fullscreen */
+body.run-fullstats .run-right{ display: none !important; }
+
+/* Bottom area fills */
+body.run-fullstats .run-bottom{
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 1.2rem 1rem 1.1rem !important;
+  gap: 1rem !important;
+}
+
+/* Stats column */
+body.run-fullstats .run-stats{
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1rem !important;
+  flex: 1 !important;
+
+  opacity: 1 !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+
+/* Stat cards */
+body.run-fullstats .run-stats .stat{
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 20px !important;
+  padding: 1.05rem 1rem !important;
+
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)) !important;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+body.run-fullstats .run-stats .stat-label{
+  font-size: 0.95rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.55 !important;
+  color: #fff !important;
+}
+body.run-fullstats .run-stats .stat-value{
+  font-size: 2.2rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em;
+  color: #fff !important;
+}
+
+/* TIME hero (2nd stat) */
+body.run-fullstats .run-stats .stat:nth-child(2){
+  padding-top: 1.2rem !important;
+  padding-bottom: 1.2rem !important;
+}
+body.run-fullstats .run-stats .stat:nth-child(2) .stat-value{
+  font-size: 3.6rem !important;
+  line-height: 1.0;
+}
+
+/* Pace slightly smaller */
+body.run-fullstats .run-stats .stat:nth-child(1) .stat-value{
+  font-size: 2.0rem !important;
+  opacity: 0.95;
+}
+
+/* Actions pinned bottom */
+body.run-fullstats .run-actions{
+  margin-top: auto;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem !important;
+  padding-top: 0.9rem !important;
+}
+body.run-fullstats .run-actions .run-btn{
+  border-radius: 999px !important;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.35);
+}
+
+/* Finish button style */
+body.run-fullstats .run-actions .run-secondary{
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #fff;
+}
+body.run-fullstats .run-actions .run-btn:disabled{
+  opacity: 0.5;
+  box-shadow: none;
+}

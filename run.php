@@ -52,10 +52,10 @@ if ($title === '') $title = 'Run route';
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?= htmlspecialchars($title) ?> | TrailForgeX</title>
 
-  <link rel="stylesheet" href="master.css" />
+  <link rel="stylesheet" href="master.css?v=2026-02-11-1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
-<body>
+<body class="requires-auth run-prestart">
   <main class="run-main">
     <div class="run-wrap">
 
@@ -69,6 +69,13 @@ if ($title === '') $title = 'Run route';
           <div class="run-title" id="routeTitle"><?= htmlspecialchars($title) ?></div>
           <div class="run-gps" id="gpsStatus">GPS: —</div>
           <div class="run-complete" id="completePill" style="display:none;">✅ Route completed</div>
+          <button class="run-min-btn" id="btnMinimize" type="button" aria-label="Show map" title="Show map">
+            ↘
+          </button>
+          <button class="run-expand-btn" id="btnExpand" type="button" aria-label="Show stats" title="Show stats">
+            ↖
+          </button>
+
         </div>
 
         <!-- Right floating -->
@@ -112,6 +119,6 @@ if ($title === '') $title = 'Run route';
       planned: <?= json_encode($coords, JSON_UNESCAPED_UNICODE) ?>
     };
   </script>
-  <script src="main.js"></script>
+  <script src="main.js?v=2026-02-11-1"></script>
 </body>
 </html>
