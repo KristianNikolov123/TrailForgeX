@@ -52,18 +52,45 @@ try {
   $stmt->close();
 
   // 3) Create new user
-  $username = preg_replace('/[^a-zA-Z0-9_]/', '', strtolower(explode('@', $email)[0]));
-  if (!$username) $username = 'user' . rand(1000,9999);
+$base = preg_replace('/[^a-zA-Z0-9_]/', '', strtolower(explode('@', $email)[0]));
+if (!$base) $base = 'user';
 
-  $stmt = $connection->prepare("INSERT INTO users (username, email, password_hash, oauth_provider, oauth_sub, oauth_email) VALUES (?, ?, '', 'google', ?, ?)");
-  $stmt->bind_param("ssss", $username, $email, $sub, $email);
+$username = $base;
+$try = 0;
+
+// ensure unique username
+while (true) {
+  $stmt = $connection->prepare("SELECT id FROM users WHERE username=? LIMIT 1");
+  $stmt->bind_param("s", $username);
   $stmt->execute();
-  $newId = $stmt->insert_id;
+  $stmt->store_result();
+  $exists = $stmt->num_rows > 0;
   $stmt->close();
 
-  login_user((int)$newId, safe_next());
+  if (!$exists) break;
+  $try++;
+  $username = $base . $try; // e.g. nikolovviktor0852
+  if ($try > 9999) { $username = 'user' . rand(100000,999999); break; }
+}
+
+$stmt = $connection->prepare("
+  INSERT INTO users (username, email, password_hash, oauth_provider, oauth_sub, oauth_email, is_verified)
+  VALUES (?, ?, NULL, 'google', ?, ?, 1)
+");
+$stmt->bind_param("ssss", $username, $email, $sub, $email);
+$stmt->execute();
+$newId = $stmt->insert_id;
+$stmt->close();
+
+login_user((int)$newId, safe_next());
+
 
 } catch (Throwable $e) {
-  error_log("Google OAuth error: " . $e->getMessage());
-  die("OAuth failed");
+  echo "<pre>";
+  echo "OAuth error:\n";
+  echo $e->getMessage();
+  echo "\n\n";
+  echo $e->getTraceAsString();
+  echo "</pre>";
+  exit;
 }

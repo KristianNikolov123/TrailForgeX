@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../../includes/mailer.php';
+require_once __DIR__ . '/../../includes/dbconn.php';
+require_once __DIR__ . '/../../includes/bootstrap.php';
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -20,7 +23,6 @@ if (!$username || !$email || !$password) {
     exit;
 }
 
-require_once '../../includes/dbconn.php';
 if ($connection->connect_errno) {
     echo json_encode(['success' => false, 'error' => 'DB connection failed']);
     exit;
@@ -34,15 +36,37 @@ if ($stmt->num_rows > 0) {
     echo json_encode(['success' => false, 'error' => 'Username or email already exists']);
     exit;
 }
-// For demo: store password as plain text (INSECURE), use password_hash() in prod
-$stmt = $connection->prepare('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)');
-$stmt->bind_param('sss', $username, $email, $password);
+
+$hash = password_hash($password, PASSWORD_DEFAULT);
+
+$stmt = $connection->prepare('INSERT INTO users (username, email, password_hash, is_verified) VALUES (?, ?, ?, 0)');
+$stmt->bind_param('sss', $username, $email, $hash);
+
 $stmt->execute();
 $user_id = $stmt->insert_id;
 $stmt->close();
+
+$code = random_int(100000, 999999);
+$expires = date('Y-m-d H:i:s', time() + 900); // 15 minutes
+
+$stmt = $connection->prepare('UPDATE users SET verification_code = ?, verification_expires = ? WHERE id = ?');
+$stmt->bind_param('ssi', $code, $expires, $user_id);
+$stmt->execute();
+$stmt->close();
+
+$result = sendVerificationEmail($email, $code);
+if ($result !== true) {
+    echo json_encode(['success' => false, 'error' => $result]);
+    exit;
+}
+
+
 mysqli_close($connection);
-session_start();
-$_SESSION['user_id'] = $user_id;
-echo json_encode(['success' => true, 'user_id' => $user_id]);
 
+$_SESSION['pending_verify_user_id'] = $user_id;
 
+echo json_encode([
+    'success' => true,
+    'verify_required' => true
+]);
+exit;

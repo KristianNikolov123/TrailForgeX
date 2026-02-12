@@ -19,7 +19,7 @@ async function geocodeAddress(query) {
   }
   
   try {
-      const response = await fetch('https://localhost:8000/geocode', {
+      const response = await fetch('http://127.0.0.1:8000/geocode', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ query: query.trim() })
@@ -471,11 +471,19 @@ genForm.addEventListener('submit', async function(e) {
       payload.center_lat = center.lat;
       payload.center_lng = center.lng;
     }
+    // Determine mode explicitly (no guessing)
+    if (isAreaMode) {
+      payload.mode = 'loop_in_area';
+    } else if (payload.end_lat !== null && payload.end_lng !== null) {
+      payload.mode = 'point_to_point';
+    } else {
+      payload.mode = 'loop_from_start';
+    }
 
     // ✅ ONE call that returns 3 routes
     // Your backend endpoint should be /generate3 (FastAPI) or whatever you choose.
     // Change URL here if needed.
-    const resp = await fetch('https://localhost:8000/generate3', {
+    const resp = await fetch('http://127.0.0.1:8000/generate3', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -655,90 +663,110 @@ document.querySelectorAll('.trails-tab').forEach(tab => {
 // (uses CSS classes instead of inline styles)
 // =============================================
 function renderRouteChoices(routes) {
-const choicesWrap = document.getElementById('routeChoices');
-const routeResult = document.getElementById('route-result');
-const routeDistance = document.getElementById('route-distance');
-const routeElevation = document.getElementById('route-elevation');
+  const choicesWrap     = document.getElementById('routeChoices');
+  const routeResult     = document.getElementById('route-result');
+  const routeDistance   = document.getElementById('route-distance');
+  const routeElevation  = document.getElementById('route-elevation');
 
-if (!choicesWrap) return;
+  if (!choicesWrap) return;
 
-choicesWrap.style.display = 'block';
-choicesWrap.innerHTML = '';
+  choicesWrap.style.display = 'block';
+  choicesWrap.innerHTML = '';
 
-const top3 = (routes || []).slice(0, 3);
+  const top3 = (routes || []).slice(0, 3);
 
-top3.forEach((r, idx) => {
-  const dist =
-    r?.distance_km != null && !Number.isNaN(Number(r.distance_km))
-      ? Number(r.distance_km).toFixed(2)
-      : '—';
-
-  const elev =
-    r?.elevation_gain_m != null && !Number.isNaN(Number(r.elevation_gain_m))
-      ? Number(r.elevation_gain_m).toFixed(0)
-      : '—';
-
-  const title = (r?.title && String(r.title).trim()) ? r.title : `Option ${idx + 1}`;
-  const summary = (r?.summary && String(r.summary).trim())
-    ? r.summary
-    : 'Preview or select to show it on the map.';
-
-  const card = document.createElement('div');
-  card.className = 'choice-card';
-
-  card.innerHTML = `
-    <div class="choice-title">${escapeHtml(title)}</div>
-    <div class="choice-meta">${dist} km · ⬆ ${elev} m</div>
-    <div class="choice-meta" style="margin-top:.45rem;opacity:.95;">
-      ${escapeHtml(summary)}
-    </div>
-
-    <div class="choice-actions">
-      <button type="button" class="btn-share js-preview">Preview</button>
-      <button type="button" class="cta-button route-btn js-select" style="margin-top:0;">
-        Select
-      </button>
-    </div>
-  `;
-
-  // Guard to avoid double save (card click + button click)
+  // track "active" card and prevent double clicks while saving
+  let activeIndex = -1;
   let selecting = false;
 
-  const previewBtn = card.querySelector('.js-preview');
-  const selectBtn = card.querySelector('.js-select');
+  const setActive = (idx) => {
+    activeIndex = idx;
+    [...choicesWrap.querySelectorAll('.choice-card')].forEach((el, i) => {
+      el.classList.toggle('is-active', i === idx);
+    });
+  };
 
-  // Preview: show on map but do NOT save
-  previewBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    showRouteOnMap(r, { routeResult, routeDistance, routeElevation });
+  top3.forEach((r, idx) => {
+    const dist =
+      r?.distance_km != null && !Number.isNaN(Number(r.distance_km))
+        ? Number(r.distance_km).toFixed(2)
+        : '—';
+
+    const elev =
+      r?.elevation_gain_m != null && !Number.isNaN(Number(r.elevation_gain_m))
+        ? Number(r.elevation_gain_m).toFixed(0)
+        : '—';
+
+    const title = (r?.title && String(r.title).trim()) ? r.title : `Option ${idx + 1}`;
+    const summary = (r?.summary && String(r.summary).trim())
+      ? r.summary
+      : 'Tap to select & enable actions.';
+
+    const card = document.createElement('div');
+    card.className = 'choice-card';
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+
+    card.innerHTML = `
+      <div class="choice-title">${escapeHtml(title)}</div>
+      <div class="choice-meta">${dist} km · ⬆ ${elev} m</div>
+      <div class="choice-meta" style="margin-top:.45rem;opacity:.95;">
+        ${escapeHtml(summary)}
+      </div>
+
+      <!-- Optional preview button (remove this block if you want NO buttons at all) -->
+      <div class="choice-actions">
+        <button type="button" class="btn-share js-preview">Preview</button>
+      </div>
+    `;
+
+    const previewBtn = card.querySelector('.js-preview');
+
+    // Preview only (does NOT save / does NOT enable favourite+publish)
+    previewBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showRouteOnMap(r, { routeResult, routeDistance, routeElevation });
+    });
+
+    // Whole card selects (shows + saves + enables actions)
+    const doSelect = async () => {
+      if (selecting) return;
+      selecting = true;
+
+      // UI feedback
+      setActive(idx);
+      card.classList.add('is-loading');
+
+      try {
+        await selectRouteAndSave(r, { routeResult, routeDistance, routeElevation });
+        // If your selectRouteAndSave sets window.currentRouteId and enables buttons, you're done.
+      } finally {
+        card.classList.remove('is-loading');
+        selecting = false;
+      }
+    };
+
+    card.addEventListener('click', doSelect);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        doSelect();
+      }
+    });
+
+    choicesWrap.appendChild(card);
   });
 
-  // Select: show + save
-  selectBtn?.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    if (selecting) return;
-    selecting = true;
-    selectBtn.disabled = true;
-    selectBtn.textContent = 'Selecting...';
-
-    try {
-      await selectRouteAndSave(r, { routeResult, routeDistance, routeElevation });
-    } finally {
-      // If save fails we re-enable, if succeeds you might want to keep disabled—your choice
-      selectBtn.disabled = false;
-      selectBtn.textContent = 'Select';
-      selecting = false;
-    }
-  });
-
-  // Optional: clicking the whole card previews (not select)
-  card.addEventListener('click', () => {
-    showRouteOnMap(r, { routeResult, routeDistance, routeElevation });
-  });
-
-  choicesWrap.appendChild(card);
-});
+  // Auto-select the best route immediately (so Favourite/Publish work right away)
+  if (top3.length) {
+    const bestIdx = window.bestGeneratedIndex ?? 0;
+    const idx = Math.max(0, Math.min(bestIdx, top3.length - 1));
+    // simulate click selection
+    const firstCard = choicesWrap.querySelectorAll('.choice-card')[idx];
+    firstCard?.click();
+  }
 }
+
 
 //------------------------------------------//
 // Difficulty Score
@@ -843,63 +871,71 @@ const favBtn = document.getElementById('favouriteRouteBtn');
 const favIcon = document.getElementById('favouriteIcon');
 
 async function selectRouteAndSave(r, { routeResult, routeDistance, routeElevation }) {
-// Always show chosen route
-showRouteOnMap(r, { routeResult, routeDistance, routeElevation });
 
-// Save ONLY selected route
-try {
-  const routeLabel = getDefaultRouteLabel();
-  const saveData = {
-    coordinates: r.coordinates,
-    title: (r.title && r.title.trim()) ? r.title : routeLabel,
-    activity_type: document.getElementById('prefer')?.value || 'green',
-    description: r.description || '',
-    start_lat: (r.start_lat != null ? r.start_lat : null),
-    start_lng: (r.start_lng != null ? r.start_lng : null),
-    distance_km: r.distance_km,
-    elevation_gain_m: r.elevation_gain_m
-  };
+  // Always show chosen route
+  showRouteOnMap(r, { routeResult, routeDistance, routeElevation });
 
-  const saveResp = await fetch('api/routes/save.php', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(saveData)
-  });
-  
+  try {
+    const routeLabel = getDefaultRouteLabel();
 
-  const raw = await saveResp.text();
-  let saveResult;
-  try { saveResult = JSON.parse(raw); }
-  catch { throw new Error('save.php returned non-JSON: ' + raw.slice(0, 200)); }
+    const saveData = {
+      coordinates: r.coordinates,
+      title: (r.title && r.title.trim()) ? r.title : routeLabel,
+      activity_type: document.getElementById('prefer')?.value || 'green',
+      description: r.description || '',
+      start_lat: (r.start_lat != null ? r.start_lat : null),
+      start_lng: (r.start_lng != null ? r.start_lng : null),
+      distance_km: r.distance_km,
+      elevation_gain_m: r.elevation_gain_m
+    };
 
-  console.log('save.php result:', saveResult);
+    const saveResp = await fetch('api/routes/save.php', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(saveData)
+    });
 
-  if (!saveResp.ok || !saveResult.success || !saveResult.route_id) {
-    throw new Error(saveResult.error || 'Save failed');
+    const raw = await saveResp.text();
+    let saveResult;
+    try {
+      saveResult = JSON.parse(raw);
+    } catch {
+      throw new Error('save.php returned non-JSON: ' + raw.slice(0, 200));
+    }
+
+    console.log('save.php result:', saveResult);
+
+    if (!saveResp.ok || !saveResult.success || !saveResult.route_id) {
+      throw new Error(saveResult.error || 'Save failed');
+    }
+
+    // ✅ Set current route ID globally
+    window.currentRouteId = saveResult.route_id;
+
+    // ✅ Enable Favourite + Publish buttons properly
+    const favBtn = document.getElementById('favouriteRouteBtn');
+    const pubBtn = document.getElementById('shareRouteBtn');
+
+    if (favBtn) favBtn.disabled = false;
+    if (pubBtn) pubBtn.disabled = false;
+
+    // Update hidden field for safety
+    let idHidden = document.getElementById('currentRouteId');
+    if (!idHidden) {
+      idHidden = document.createElement('input');
+      idHidden.type = 'hidden';
+      idHidden.id = 'currentRouteId';
+      document.body.appendChild(idHidden);
+    }
+    idHidden.value = saveResult.route_id;
+
+  } catch (err) {
+    console.warn('Save error:', err);
+    alert('Route was not saved, cannot favourite. Error: ' + (err.message || 'unknown'));
   }
-
-  window.currentRouteId = saveResult.route_id;
-
-  if (favBtn) favBtn.disabled = false;
-
-  const pubBtn = document.getElementById('shareRouteBtn');
-  if (pubBtn) pubBtn.disabled = false;
-
-  let idHidden = document.getElementById('currentRouteId');
-  if (!idHidden) {
-    idHidden = document.createElement('input');
-    idHidden.type = 'hidden';
-    idHidden.id = 'currentRouteId';
-    document.body.appendChild(idHidden);
-  }
-  idHidden.value = saveResult.route_id;
-
-} catch (err) {
-  console.warn('Save error:', err);
-  alert('Route was not saved, cannot favourite. Error: ' + (err.message || 'unknown'));
 }
-}
+
 
 // Tiny helper to prevent injecting HTML through title/summary
 function escapeHtml(str) {
@@ -1661,27 +1697,63 @@ const registerForm = document.getElementById('registerForm');
 if (registerForm) {
   registerForm.onsubmit = async function(e) {
     e.preventDefault();
+
     const username = document.getElementById('registerUsername').value;
     const email = document.getElementById('registerEmail').value;
     const password = document.getElementById('registerPassword').value;
+
     const res = await fetch('api/routes/register.php', {
       method: 'POST',
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       body: `username=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
     });
+
     let data;
     try {
       data = await res.json();
     } catch (err) {
       data = { success: false, error: 'Server error: invalid response' };
     }
-    if (data.success) {
-      window.location.reload();
-    } else {
-      document.getElementById('registerError').innerText = data.error || 'Registration failed.';
+
+    if (!data.success) {
+      document.getElementById('registerError').innerText =
+        data.error || 'Registration failed.';
+      return;
     }
+
+    // ✅ NEW LOGIC
+    if (data.verify_required) {
+      const modal = document.getElementById('verifyModal');
+      if (modal) modal.style.display = 'flex';
+      return;
+    }
+
+    // fallback (should not happen)
+    window.location.href = 'index.php';
   };
 }
+
+
+const verifyBtn = document.getElementById('verifySubmitBtn');
+
+verifyBtn?.addEventListener('click', async () => {
+  const code = document.getElementById('verifyCodeInput').value.trim();
+
+  const resp = await fetch('api/auth/verify.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+
+  const data = await resp.json();
+
+  if (!data.success) {
+    document.getElementById('verifyError').textContent = data.error;
+    return;
+  }
+
+  window.location.href = 'index.php';
+});
 
 // --- Appended: UI JS for Trails/Favs/Share (for new features only) ---
 
@@ -1999,7 +2071,67 @@ function attachTrailsStarHandler() {
   }, true);
 }
 
+function openFinishModal({ onConfirm }) {
+  const modal = document.getElementById('finishModal');
+  if (!modal) return;
 
+  // Pull current stats from UI
+  const t = document.getElementById('timeTxt')?.textContent?.trim() || '00:00';
+  const d = document.getElementById('distTxt')?.textContent?.trim() || '0.00 km';
+  const p = document.getElementById('paceTxt')?.textContent?.trim() || '—';
+
+  const finishTime = document.getElementById('finishTime');
+  const finishDist = document.getElementById('finishDist');
+  const finishPace = document.getElementById('finishPace');
+
+  if (finishTime) finishTime.textContent = t;
+  if (finishDist) finishDist.textContent = d;
+  if (finishPace) finishPace.textContent = p;
+
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+
+  const close = () => {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+  };
+
+  // close buttons / backdrop
+  modal.querySelectorAll('[data-close="1"]').forEach(el => {
+    el.onclick = () => close();
+  });
+
+  // Back button
+  const backBtn = document.getElementById('finishKeepEditing');
+  if (backBtn) backBtn.onclick = () => close();
+
+  // Confirm button
+  const confirmBtn = document.getElementById('finishConfirm');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Save & Exit';
+    confirmBtn.onclick = async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Saving...';
+      try {
+        await onConfirm?.();
+      } finally {
+        // usually you redirect after save, so no need to close
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Save & Exit';
+      }
+    };
+  }
+
+  // ESC closes
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      close();
+      window.removeEventListener('keydown', onKey);
+    }
+  };
+  window.addEventListener('keydown', onKey);
+}
 
 // ---------- one DOMContentLoaded ----------
 document.addEventListener('DOMContentLoaded', () => {
@@ -2404,8 +2536,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  finishBtn?.addEventListener('click', () => endAndSave());
-  
+  finishBtn?.addEventListener('click', () => {
+    openFinishModal({ onConfirm: endAndSave });
+  });
+    
   async function endAndSave(){
     running = false;
     const durationSec = Math.max(1, Math.round(elapsedSec()));
@@ -2759,38 +2893,38 @@ document.addEventListener('DOMContentLoaded', () => {
   
 
 
-  finishBtn?.addEventListener('click', async () => {
-    running = false;
-    const durationSec = Math.max(1, Math.round(elapsedSec()));
-    const durationMin = Math.max(1, Math.round(durationSec / 60));
-    const distanceKm = +(totalDistM / 1000).toFixed(2);
-
-    stopWatch();
-
-    const body = new URLSearchParams();
-    body.set('duration_min', String(durationMin));
-    body.set('distance_km', String(distanceKm));
-
-    try {
-      const res = await fetch('api/routes/record_done.php', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString()
-      });
-
-      const data = await res.json().catch(() => null);
-      if (!data?.success) {
-        alert(data?.error || 'Failed to save.');
-        return;
+  finishBtn?.addEventListener('click', () => {
+    openFinishModal({
+      onConfirm: async () => {
+        running = false;
+        const durationSec = Math.max(1, Math.round(elapsedSec()));
+        const durationMin = Math.max(1, Math.round(durationSec / 60));
+        const distanceKm = +(totalDistM / 1000).toFixed(2);
+  
+        stopWatch();
+  
+        const body = new URLSearchParams();
+        body.set('duration_min', String(durationMin));
+        body.set('distance_km', String(distanceKm));
+  
+        const res = await fetch('api/routes/record_done.php', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString()
+        });
+  
+        const data = await res.json().catch(() => null);
+        if (!data?.success) {
+          alert(data?.error || 'Failed to save.');
+          return;
+        }
+  
+        window.location.href = 'trails.php';
       }
+    });
+  });  
 
-      window.location.href = 'trails.php';
-    } catch (e) {
-      console.error(e);
-      alert('Failed to save (see console).');
-    }
-  });
   
 })();
 

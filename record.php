@@ -59,6 +59,50 @@ require_once __DIR__ . '/includes/auth_guard.php';
   </div>
 </main>
 
+<!-- =========================
+     FINISH / CONGRATS MODAL
+========================== -->
+<div id="finishModal" class="finish-modal" aria-hidden="true">
+  <div class="finish-backdrop" data-close="1"></div>
+
+  <div class="finish-sheet" role="dialog" aria-modal="true" aria-labelledby="finishTitle">
+    <button class="finish-close" type="button" aria-label="Close" data-close="1">✕</button>
+
+    <div class="finish-header">
+      <div class="finish-badge">🎉</div>
+      <h2 id="finishTitle" class="finish-title">Congrats!</h2>
+      <p class="finish-sub">Activity completed</p>
+    </div>
+
+    <div class="finish-stats">
+      <div class="finish-stat">
+        <div class="finish-label">Time</div>
+        <div class="finish-value" id="finishTime">00:00</div>
+      </div>
+
+      <div class="finish-stat">
+        <div class="finish-label">Distance</div>
+        <div class="finish-value" id="finishDist">0.00 km</div>
+      </div>
+
+      <div class="finish-stat">
+        <div class="finish-label">Avg pace</div>
+        <div class="finish-value" id="finishPace">—</div>
+      </div>
+    </div>
+
+    <div class="finish-actions">
+      <button class="finish-btn finish-secondary" type="button" id="finishKeepEditing">
+        Back
+      </button>
+      <button class="finish-btn finish-primary" type="button" id="finishConfirm">
+        Save & Exit
+      </button>
+    </div>
+  </div>
+</div>
+
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   window.RECORD_PAGE = {

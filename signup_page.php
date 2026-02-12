@@ -52,9 +52,9 @@ if (!preg_match('/^[a-zA-Z0-9_\-\/]+\.php$/', $next)) $next = 'generate.php';
             <div class="auth-divider"><span>or</span></div>
             
             <div class="auth-oauth">
-                <a class="auth-oauth-btn google" href="auth/google_start.php?next=<?= urlencode($next) ?>">
-                    Continue with Google
-                </a>
+            <a class="auth-oauth-btn google" href="/trailforgex/api/auth/google_start.php?next=<?= urlencode($next) ?>">
+              Continue with Google
+            </a>
             </div>
         </form>
 
@@ -67,6 +67,19 @@ if (!preg_match('/^[a-zA-Z0-9_\-\/]+\.php$/', $next)) $next = 'generate.php';
         </div>
     </div> 
   </main>
+
+  <div id="verifyModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h2>Verify your email</h2>
+      <p>Enter the 6-digit code sent to your email.</p>
+
+      <input type="text" id="verifyCodeInput" maxlength="6" placeholder="123456">
+
+      <button id="verifySubmitBtn">Verify</button>
+
+      <div id="verifyError" style="color:red;margin-top:10px;"></div>
+    </div>
+  </div>
   <script src="main.js"></script>
 </body>
 </html>

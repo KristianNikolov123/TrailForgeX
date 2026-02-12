@@ -27,6 +27,7 @@ class ComposerStaticInitdd43ffcc530b96810757e497dacac9da
             'Psr\\Http\\Message\\' => 17,
             'Psr\\Http\\Client\\' => 16,
             'PhpOption\\' => 10,
+            'PHPMailer\\PHPMailer\\' => 20,
         ),
         'L' =>
         array (
@@ -70,6 +71,10 @@ class ComposerStaticInitdd43ffcc530b96810757e497dacac9da
         'PhpOption\\' =>
         array (
             0 => __DIR__ . '/..' . '/phpoption/phpoption/src/PhpOption',
+        ),
+        'PHPMailer\\PHPMailer\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/phpmailer/phpmailer/src',
         ),
         'League\\OAuth2\\Client\\' =>
         array (
