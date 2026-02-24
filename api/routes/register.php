@@ -37,12 +37,14 @@ if ($stmt->num_rows > 0) {
     exit;
 }
 
-$hash = password_hash($password, PASSWORD_DEFAULT);
+$hashed = password_hash($password, PASSWORD_DEFAULT);
 
-$stmt = $connection->prepare('INSERT INTO users (username, email, password_hash, is_verified) VALUES (?, ?, ?, 0)');
-$stmt->bind_param('sss', $username, $email, $hash);
-
+$stmt = $connection->prepare(
+  'INSERT INTO users (username, email, password_hash, is_verified) VALUES (?, ?, ?, 0)'
+);
+$stmt->bind_param('sss', $username, $email, $hashed);
 $stmt->execute();
+
 $user_id = $stmt->insert_id;
 $stmt->close();
 

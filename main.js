@@ -2612,8 +2612,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function enterFullStats() {
     document.body.classList.add('run-fullstats');
-    // fullscreen stats should only be used after start
-    // (but it's fine to allow it anytime if you want)
     setTimeout(() => {
       const m = window.__leafletMaps?.runMap || window.__leafletMaps?.recordMap;
       if (m) m.invalidateSize(true);
@@ -2656,8 +2654,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- GPS Ready gate ---
-  const GPS_READY_ACC = 15;   // since you now get ±2m, we can be strict
-  const GPS_READY_STREAK = 3;
+  const GPS_READY_ACC = 1000;   // since you now get ±2m, we can be strict
+  const GPS_READY_STREAK = 0;
   let gpsReady = false;
   let gpsGoodCount = 0;
 
@@ -2790,7 +2788,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const ACC_REJECT = 40;
         if (acc > ACC_REJECT) return;
 
-        // smooth
         if (!smooth) smooth = { lat: rawLat, lng: rawLng };
         const alpha = 0.25;
         smooth.lat = smooth.lat + alpha * (rawLat - smooth.lat);
@@ -2977,13 +2974,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btn.addEventListener('click', toggle);
 
-  // ✅ clicking inside dropdown should NOT close it
   dd.addEventListener('click', (e) => e.stopPropagation());
 
-  // ✅ click anywhere else closes it
   document.addEventListener('click', () => close());
 
-  // ✅ ESC closes
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') close();
   });

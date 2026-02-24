@@ -40,8 +40,6 @@ if (!$is_verified) {
     echo json_encode(['success' => false, 'error' => 'Email not verified']);
     exit;
 }
-// 🚫 Block password login for Google accounts
-
 if ($password_hash === null) {
     echo json_encode([
         'success' => false,
@@ -49,12 +47,30 @@ if ($password_hash === null) {
     ]);
     exit;
 }
-if (password_verify($password, $password_hash)) {
+
+$isBcrypt = is_string($password_hash) && preg_match('/^\$2[aby]\$/', $password_hash);
+
+if ($isBcrypt) {
+    $ok = password_verify($password, $password_hash);
+} else {
+    $ok = hash_equals((string)$password_hash, (string)$password);
+
+    if ($ok) {
+        $newHash = password_hash($password, PASSWORD_DEFAULT);
+        $up = $connection->prepare("UPDATE users SET password_hash=? WHERE id=?");
+        $up->bind_param("si", $newHash, $id);
+        $up->execute();
+        $up->close();
+    }
+}
+
+if ($ok) {
     $_SESSION['user_id'] = $id;
     echo json_encode(['success' => true, 'user_id' => $id]);
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid username or password']);
 }
+
 $stmt->close();
 mysqli_close($connection);
 

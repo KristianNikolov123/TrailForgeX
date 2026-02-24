@@ -126,14 +126,14 @@ $is_logged_in = !empty($_SESSION['user_id']);
                 <h2>Ready to forge your next trail?</h2>
                 <p>Generate 3 options instantly and pick the best adventure.</p>
             </div>
+            <?php if (!$is_logged_in): ?>
             <div class="cta-actions">
                 <a href="generate.php" class="cta-button">Generate a Route</a>
-                <?php if (!$is_logged_in): ?>
                     <button class="btn-secondary" onclick="document.getElementById('loginModal').style.display='flex';">
                         Log in / Sign up
                     </button>
-                <?php endif; ?>
             </div>
+            <?php endif; ?>
         </div>
     </section>
 

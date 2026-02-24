@@ -3,12 +3,12 @@ require_once __DIR__ . '/includes/bootstrap.php';
 
 
 if (!empty($_SESSION['user_id'])) {
-  header('Location: generate.php');
+  header('Location: index.php');
   exit;
 }
 
-$next = $_GET['next'] ?? 'generate.php';
-if (!preg_match('/^[a-zA-Z0-9_\-\/]+\.php$/', $next)) $next = 'generate.php';
+$next = $_GET['next'] ?? 'index.php';
+if (!preg_match('/^[a-zA-Z0-9_\-\/]+\.php$/', $next)) $next = 'index.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">

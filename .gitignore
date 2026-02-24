@@ -17,3 +17,7 @@ insert_debug.txt
 uploads/*
 !uploads/.gitkeep
 !uploads/profiles/.gitkeep
+
+GOOGLE_API_SETUP.md
+SETUP.md
+insert_debug.txt
