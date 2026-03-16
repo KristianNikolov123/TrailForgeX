@@ -35,3 +35,9 @@ jobs:
         # Тук симулираме изпълнение на тестове, тъй като PHPUnit изисква конфигурация
         echo "Running unit tests for login logic and route generation..."
         # phpunit tests/LoginTest.php
+    
+    - name: Install dependencies
+      run: composer require --dev phpunit/phpunit ^10
+
+    - name: Run Unit Tests
+      run: ./vendor/bin/phpunit tests/DifficultyTest.php
