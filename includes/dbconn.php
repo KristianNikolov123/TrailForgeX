@@ -2,7 +2,7 @@
     define("HOSTNAME", "localhost");
     define("USERNAME", "root");
     define("PASSWORD", "");
-    define("DATABASE", "trailforgex");
+    define("DATABASE", "trailforgex")
 
     $connection = mysqli_connect(HOSTNAME, USERNAME, PASSWORD, DATABASE);
 
