@@ -12,7 +12,7 @@ class DifficultyTest extends TestCase {
     
     public function testEasyRoute() {
         $score = difficultyScore(2, 20);
-        $this->assertGreaterThan(10, $score);
+        $this->assertLessThan(2.5, $score, "Маршрутът трябва да е Easy");
     }
 
     public function testHardRoute() {
