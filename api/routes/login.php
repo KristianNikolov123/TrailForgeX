@@ -65,7 +65,8 @@ if ($isBcrypt) {
 }
 
 if ($ok) {
-    $_SESSION['user_id'] = $id;
+    $_SESSION['user_id']  = $id;
+    $_SESSION['username'] = $username;
     echo json_encode(['success' => true, 'user_id' => $id]);
 } else {
     echo json_encode(['success' => false, 'error' => 'Invalid username or password']);

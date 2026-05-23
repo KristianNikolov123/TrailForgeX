@@ -12,8 +12,9 @@ function safe_next(): string {
   return $next;
 }
 
-function login_user(int $user_id, string $next) {
-  $_SESSION['user_id'] = $user_id;
+function login_user(int $user_id, string $next, string $username = '') {
+  $_SESSION['user_id']  = $user_id;
+  $_SESSION['username'] = $username;
   header('Location: /trailforgex/' . ltrim($next, '/'));
   exit;
 }

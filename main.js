@@ -39,7 +39,6 @@ async function geocodeAddress(query) {
           throw new Error('Invalid geocoding response: missing coordinates');
       }
       
-      console.log('Geocoding successful:', data);
       return data;
   } catch (error) {
       console.error('Geocoding error:', error);
@@ -145,10 +144,7 @@ function displayRoute(route) {
       return;
   }
   
-  console.log('Raw route coordinates:', route.coordinates.slice(0, 5), '...', route.coordinates.slice(-2));
-  
   // Ensure coordinates are in [lat, lng] format for Leaflet
-  // OSMnx returns coordinates as (lat, lng) tuples
   const coords = route.coordinates.map((c, idx) => {
       // Handle both [lat, lng] and [lng, lat] formats
       if (Array.isArray(c) && c.length >= 2) {
@@ -180,12 +176,8 @@ function displayRoute(route) {
       return;
   }
   
-  console.log('Displaying route with', coords.length, 'valid points');
-  console.log('First coord:', coords[0], 'Last coord:', coords[coords.length - 1]);
-  
   // Initialize map if not already done
   if (!map) {
-      console.log('Initializing map...');
       initMap(coords[0]);
   }
   
@@ -246,9 +238,6 @@ function displayRoute(route) {
       // Bring route to front
       routeLayer.bringToFront();
       
-      console.log('Route polyline added to map successfully');
-      console.log('Route bounds:', routeLayer.getBounds());
-      
       // Force map to invalidate size and refresh
       setTimeout(() => {
           map.invalidateSize();
@@ -306,8 +295,6 @@ function displayRoute(route) {
               animate: true,
               duration: 0.5
           });
-          
-          console.log('Map fitted to route bounds');
           
           // Double-check after a short delay
           setTimeout(() => {
@@ -867,9 +854,6 @@ function getDefaultRouteLabel() {
   return `${startLabel} → ${endLabel}`;
 }
 
-const favBtn = document.getElementById('favouriteRouteBtn');
-const favIcon = document.getElementById('favouriteIcon');
-
 async function selectRouteAndSave(r, { routeResult, routeDistance, routeElevation }) {
 
   // Always show chosen route
@@ -903,8 +887,6 @@ async function selectRouteAndSave(r, { routeResult, routeDistance, routeElevatio
     } catch {
       throw new Error('save.php returned non-JSON: ' + raw.slice(0, 200));
     }
-
-    console.log('save.php result:', saveResult);
 
     if (!saveResp.ok || !saveResult.success || !saveResult.route_id) {
       throw new Error(saveResult.error || 'Save failed');
@@ -1594,8 +1576,6 @@ document.addEventListener('DOMContentLoaded', function() {
   setTrailsTab(initial);
   const trailsList = document.getElementById('trailsList');
   if (trailsList) {
-    const initial = document.querySelector('.trails-tab.active')?.getAttribute('data-tab') || 'favourites';
-    setTrailsTab(initial);
     refreshActiveTab(null);
   }
 
@@ -1955,57 +1935,7 @@ function initAchievementsPage() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAchModal(); });
 }
 
-// function attachTrailsDoneHandler() {
-//   const trailsList = document.getElementById('trailsList');
-//   if (!trailsList) return;
 
-//   if (trailsList._doneHandlerAttached) return;
-//   trailsList._doneHandlerAttached = true;
-
-//   trailsList.addEventListener('click', async (e) => {
-//     const btn = e.target.closest('.trails-done-btn');
-//     if (!btn) return;
-
-//     e.preventDefault();
-//     e.stopPropagation();
-
-//     const routeId = btn.getAttribute('data-route-id');
-//     if (!routeId) return;
-
-//     // optional: ask duration
-//     const duration = prompt('How many minutes did it take? (optional)', '30');
-//     const durationMin = Math.max(0, parseInt(duration || '0', 10) || 0);
-
-//     try {
-//       const res = await fetch('api/routes/mark_done.php', {
-//         method: 'POST',
-//         credentials: 'same-origin',
-//         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-//         body: 'route_id=' + encodeURIComponent(routeId) + '&duration_min=' + encodeURIComponent(durationMin)
-//       });
-
-//       const raw = await res.text();
-//       let data;
-//       try { data = JSON.parse(raw); }
-//       catch { console.error('mark_done.php non-JSON:', raw); alert('Server returned invalid response.'); return; }
-
-//       if (!data.success) {
-//         alert(data.error || 'Failed to mark done.');
-//         return;
-//       }
-
-//       // toast achievements (your helper)
-//       showUnlockedAchievements(data);
-
-//       // refresh the active tab (so it disappears from To-Do)
-//       refreshActiveTab();
-
-//     } catch (err) {
-//       console.error(err);
-//       alert('Failed to mark done (see console).');
-//     }
-//   }, true);
-// }
 
 
 function attachTrailsSaveHandler() {
@@ -2143,7 +2073,6 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('change', onFiltersChanged);
   });
 
-  // attachTrailsDoneHandler();
   attachTrailsStarHandler();
   attachTrailsSaveHandler();
   initAchievementsPage();
@@ -2206,7 +2135,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!window.RUN_PAGE) return;
   let smooth = null;
 
-  const { routeId, planned, title } = window.RUN_PAGE;
+  const { routeId, planned } = window.RUN_PAGE;
 
   const gpsStatus = document.getElementById('gpsStatus');
   const completePill = document.getElementById('completePill');
@@ -2671,8 +2600,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const mapEl = document.getElementById('runMap');
   if (!mapEl) return;
 
-  window.__leafletMaps ??= {};
-
   if (window.__leafletMaps.recordMap) {
     setTimeout(() => window.__leafletMaps.recordMap.invalidateSize(true), 200);
     return;
@@ -2708,9 +2635,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   carto.on('tileload', () => { errs = 0; });
-  
 
-  setTimeout(() => map.invalidateSize(true), 200);
   // recorded track
   let recorded = []; // {lat,lng,t,acc}
   let recordedLine = L.polyline([], {
@@ -2981,4 +2906,4 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') close();
   });
-}); 
+});

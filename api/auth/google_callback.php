@@ -26,28 +26,30 @@ try {
   $name  = $owner->getName() ?: '';
 
   // 1) Find by provider+sub
-  $stmt = $connection->prepare("SELECT id FROM users WHERE oauth_provider='google' AND oauth_sub=? LIMIT 1");
+  $stmt = $connection->prepare("SELECT id, username FROM users WHERE oauth_provider='google' AND oauth_sub=? LIMIT 1");
   $stmt->bind_param("s", $sub);
   $stmt->execute();
-  $stmt->bind_result($uid);
-  if ($stmt->fetch()) { 
-    $stmt->close();
-    login_user((int)$uid, safe_next());
+  $stmt->bind_result($uid, $fetched_username);
+  if ($stmt->fetch()) {
+      $stmt->close();
+      $_SESSION['username'] = $fetched_username; // add this
+      login_user((int)$uid, safe_next(), $fetched_username);
   }
   $stmt->close();
 
-  // 2) Optional: link by email if user exists
-  $stmt = $connection->prepare("SELECT id FROM users WHERE email=? LIMIT 1");
+  // 2) Link by email
+  $stmt = $connection->prepare("SELECT id, username FROM users WHERE email=? LIMIT 1");
   $stmt->bind_param("s", $email);
   $stmt->execute();
-  $stmt->bind_result($existing);
+  $stmt->bind_result($existing, $fetched_username);
   if ($stmt->fetch()) {
-    $stmt->close();
-    $stmt = $connection->prepare("UPDATE users SET oauth_provider='google', oauth_sub=?, oauth_email=? WHERE id=?");
-    $stmt->bind_param("ssi", $sub, $email, $existing);
-    $stmt->execute();
-    $stmt->close();
-    login_user((int)$existing, safe_next());
+      $stmt->close();
+      $stmt = $connection->prepare("UPDATE users SET oauth_provider='google', oauth_sub=?, oauth_email=? WHERE id=?");
+      $stmt->bind_param("ssi", $sub, $email, $existing);
+      $stmt->execute();
+      $stmt->close();
+      $_SESSION['username'] = $fetched_username; // add this
+      login_user((int)$existing, safe_next(), $fetched_username);
   }
   $stmt->close();
 
@@ -82,7 +84,8 @@ $stmt->execute();
 $newId = $stmt->insert_id;
 $stmt->close();
 
-login_user((int)$newId, safe_next());
+$_SESSION['username'] = $username;
+login_user((int)$newId, safe_next(), $username);
 
 
 } catch (Throwable $e) {

@@ -2,6 +2,7 @@ import os
 import math
 import random
 import time
+import threading
 import requests
 import certifi
 
@@ -11,16 +12,12 @@ import networkx as nx
 from functools import lru_cache
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from dotenv import load_dotenv
+from typing import Optional, Literal
 
-# ✅ NEW: real green-area detection
 from shapely.geometry import Point, LineString
 import shapely.ops as ops
-
-from typing import Optional
-from pydantic import Field
-
 
 # ----------------------------
 # ENV / APP SETUP
@@ -39,9 +36,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# No disk cache (your request)
 ox.settings.use_cache = False
 ox.settings.log_console = False
+
+# Thread lock — lru_cache is not thread-safe under concurrent FastAPI requests
+_graph_lock = threading.Lock()
 
 
 # ----------------------------
@@ -54,23 +53,20 @@ class GeocodeRequest(BaseModel):
 class RouteRequest(BaseModel):
     start_lat: float
     start_lng: float
-    end_lat: float | None = None
-    end_lng: float | None = None
+    end_lat: Optional[float] = None
+    end_lng: Optional[float] = None
     distance_km: float
-    elevation_gain_target: float | None = None  # optional
-    prefer: str  # "green" | "trail" | "road"
+    elevation_gain_target: Optional[float] = None
+    prefer: str
 
-
-from pydantic import BaseModel, Field, model_validator
-from typing import Optional, Literal
 
 Mode = Literal["loop_in_area", "loop_from_start", "point_to_point"]
+
 
 class Generate3Request(BaseModel):
     distance_km: float
     elevation_gain_target: Optional[float] = None
     prefer: str = "green"
-
     n_routes: int = Field(default=3, ge=1, le=3)
     mode: Mode = "loop_in_area"
 
@@ -78,7 +74,7 @@ class Generate3Request(BaseModel):
     center_lat: Optional[float] = None
     center_lng: Optional[float] = None
 
-    # start mode
+    # start/p2p mode
     start_lat: Optional[float] = None
     start_lng: Optional[float] = None
     end_lat: Optional[float] = None
@@ -88,55 +84,11 @@ class Generate3Request(BaseModel):
     def validate_by_mode(self):
         if self.mode == "loop_in_area":
             if self.center_lat is None or self.center_lng is None:
-                raise ValueError("center_lat and center_lng are required for loop_in_area")
+                raise ValueError("center_lat and center_lng required for loop_in_area")
         else:
             if self.start_lat is None or self.start_lng is None:
-                raise ValueError("start_lat and start_lng are required for start-based modes")
+                raise ValueError("start_lat and start_lng required for start-based modes")
         return self
-
-
-
-# ----------------------------
-# GOOGLE ELEVATION (1 call per route)
-# ----------------------------
-def elevation_gain(coords):
-    if not coords:
-        return 0
-
-    # downsample to <=510 points
-    max_samples = 510
-    if len(coords) > max_samples:
-        step = max(1, len(coords) // max_samples)
-        coords_down = coords[::step]
-        if coords_down[-1] != coords[-1]:
-            coords_down.append(coords[-1])
-        coords = coords_down
-
-    path = "|".join([f"{lat},{lng}" for lat, lng in coords])
-    url = "https://maps.googleapis.com/maps/api/elevation/json"
-
-    try:
-        rv = requests.get(
-            url,
-            params={"path": path, "samples": len(coords), "key": GOOGLE_ELEVATION_KEY},
-            timeout=25,
-            verify=certifi.where(),
-        )
-        if rv.status_code != 200:
-            return 0
-        data = rv.json()
-        if data.get("status") != "OK" or not data.get("results"):
-            return 0
-
-        elevs = [p["elevation"] for p in data["results"]]
-        gain = 0.0
-        for i in range(1, len(elevs)):
-            diff = elevs[i] - elevs[i - 1]
-            if diff > 0:
-                gain += diff
-        return int(round(gain))
-    except Exception:
-        return 0
 
 
 # ----------------------------
@@ -145,14 +97,18 @@ def elevation_gain(coords):
 @app.post("/geocode")
 def geocode(req: GeocodeRequest):
     url = "https://maps.googleapis.com/maps/api/geocode/json"
-    params = {"address": req.query, "key": GOOGLE_GEOCODING_KEY}
     try:
-        r = requests.get(url, params=params, timeout=20, verify=certifi.where()).json()
+        r = requests.get(
+            url,
+            params={"address": req.query, "key": GOOGLE_GEOCODING_KEY},
+            timeout=20,
+            verify=certifi.where(),
+        ).json()
         if r.get("status") == "OK" and r["results"]:
-            location = r["results"][0]["geometry"]["location"]
+            loc = r["results"][0]["geometry"]["location"]
             return {
-                "lat": location["lat"],
-                "lng": location["lng"],
+                "lat": loc["lat"],
+                "lng": loc["lng"],
                 "display_name": r["results"][0].get("formatted_address", req.query),
             }
         return {"error": f"Geocoding failed: {r.get('status')} for '{req.query}'"}
@@ -161,20 +117,25 @@ def geocode(req: GeocodeRequest):
 
 
 # ----------------------------
-# RAM GRAPH CACHE (NO DISK)
+# GRAPH CACHE  (thread-safe)
 # ----------------------------
-def _round4(x: float) -> float:
-    return round(x, 4)
+def _round3(x: float) -> float:
+    """~111m precision — maximises cache hits without losing meaningful accuracy."""
+    return round(x, 3)
 
 
-@lru_cache(maxsize=10)
-def get_graph_cached(center_lat: float, center_lng: float, radius_m: int):
-    # rounding increases cache hits
-    return ox.graph_from_point((_round4(center_lat), _round4(center_lng)), dist=radius_m, network_type="walk")
+@lru_cache(maxsize=12)
+def _get_graph_inner(lat: float, lng: float, radius_m: int) -> nx.MultiDiGraph:
+    return ox.graph_from_point((lat, lng), dist=radius_m, network_type="walk")
+
+
+def get_graph_cached(lat: float, lng: float, radius_m: int) -> nx.MultiDiGraph:
+    with _graph_lock:
+        return _get_graph_inner(_round3(lat), _round3(lng), radius_m)
 
 
 # ----------------------------
-# ✅ REAL GREEN AREAS (OSM polygons) + CACHE
+# GREEN AREA CACHE
 # ----------------------------
 GREEN_TAGS = {
     "leisure": ["park", "nature_reserve", "garden"],
@@ -182,119 +143,132 @@ GREEN_TAGS = {
     "natural": ["wood", "grassland"],
 }
 
-@lru_cache(maxsize=10)
-def get_green_union_cached(center_lat: float, center_lng: float, radius_m: int):
-    """
-    OSMnx v2+: use features_from_point. We union all park/green polygons.
-    """
+
+@lru_cache(maxsize=12)
+def get_green_union_cached(lat: float, lng: float, radius_m: int):
     try:
-        gdf = ox.features_from_point((_round4(center_lat), _round4(center_lng)), tags=GREEN_TAGS, dist=radius_m)
+        gdf = ox.features_from_point((lat, lng), tags=GREEN_TAGS, dist=radius_m)
         polys = gdf[gdf.geometry.type.isin(["Polygon", "MultiPolygon"])].geometry
-        if polys.empty:
-            return None
-        return ops.unary_union(polys.values)
+        return None if polys.empty else ops.unary_union(polys.values)
     except Exception:
         return None
 
 
 def mark_green_edges(G, green_union):
-    """
-    Adds d["_green"] = 1.0 if edge geometry intersects a green polygon else 0.0
-    """
+    """Pre-compute _green flag on every edge so edge_score() is O(1) later."""
     if green_union is None:
         for _, _, _, d in G.edges(keys=True, data=True):
             d["_green"] = 0.0
         return
-
     for u, v, k, d in G.edges(keys=True, data=True):
         geom = d.get("geometry")
         if geom is None:
-            x1, y1 = G.nodes[u]["x"], G.nodes[u]["y"]
-            x2, y2 = G.nodes[v]["x"], G.nodes[v]["y"]
-            geom = LineString([(x1, y1), (x2, y2)])
-
+            geom = LineString([(G.nodes[u]["x"], G.nodes[u]["y"]),
+                               (G.nodes[v]["x"], G.nodes[v]["y"])])
         try:
             d["_green"] = 1.0 if geom.intersects(green_union) else 0.0
         except Exception:
             d["_green"] = 0.0
 
-def pick_start_node(G, center_lat: float, center_lng: float, prefer: str, green_union, max_green_offset_m: int = 300):
-    fallback = ox.nearest_nodes(G, center_lng, center_lat)
 
-    # If not green, just use the real start
+# ----------------------------
+# HAVERSINE + BEARING UTILS
+# ----------------------------
+def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    R = 6_371_000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    a = (math.sin(math.radians(lat2 - lat1) / 2) ** 2
+         + math.cos(phi1) * math.cos(phi2)
+         * math.sin(math.radians(lng2 - lng1) / 2) ** 2)
+    return 2 * R * math.asin(min(1.0, math.sqrt(a)))
+
+
+def offset_point(lat: float, lng: float, bearing_deg: float, distance_m: float):
+    """
+    Returns (lat, lng) displaced from (lat, lng) by distance_m
+    along bearing_deg (0 = north, clockwise).
+    Uses the standard spherical-Earth formula — no degree-approximation shortcut.
+    """
+    R = 6_371_000
+    b = math.radians(bearing_deg)
+    lat1 = math.radians(lat)
+    lng1 = math.radians(lng)
+    lat2 = math.asin(
+        math.sin(lat1) * math.cos(distance_m / R)
+        + math.cos(lat1) * math.sin(distance_m / R) * math.cos(b)
+    )
+    lng2 = lng1 + math.atan2(
+        math.sin(b) * math.sin(distance_m / R) * math.cos(lat1),
+        math.cos(distance_m / R) - math.sin(lat1) * math.sin(lat2),
+    )
+    return math.degrees(lat2), math.degrees(lng2)
+
+
+# ----------------------------
+# GREEN-AWARE START NODE
+# ----------------------------
+def pick_start_node(G, center_lat, center_lng, prefer, green_union, max_offset_m=400):
+    """
+    For green mode: pick a node inside a green polygon close to center.
+    Uses proper haversine — not the broken degree-squared approximation.
+    Falls back to nearest node if nothing is found.
+    """
+    fallback = ox.nearest_nodes(G, center_lng, center_lat)
     if prefer != "green" or green_union is None:
         return fallback
 
-    # Collect ONLY green nodes close to the fallback node
-    fx, fy = G.nodes[fallback]["x"], G.nodes[fallback]["y"]
+    green_nodes = [
+        n for n, nd in G.nodes(data=True)
+        if haversine_m(center_lat, center_lng, nd["y"], nd["x"]) <= max_offset_m
+        and _safe_within(Point(nd["x"], nd["y"]), green_union)
+    ]
+    return random.choice(green_nodes) if green_nodes else fallback
 
-    green_nodes = []
-    for n, nd in G.nodes(data=True):
-        try:
-            if Point(nd["x"], nd["y"]).within(green_union):
-                # quick distance in meters-ish (works ok locally)
-                dx = (nd["x"] - fx)
-                dy = (nd["y"] - fy)
-                # very rough meters conversion (good enough for small radius)
-                approx_m = (dx*111000)**2 + (dy*111000)**2
-                if approx_m <= (max_green_offset_m**2):
-                    green_nodes.append(n)
-        except Exception:
-            continue
 
-    # If no green nodes nearby, start at the true start
-    if not green_nodes:
-        return fallback
-
-    return random.choice(green_nodes)
+def _safe_within(pt, polygon):
+    try:
+        return pt.within(polygon)
+    except Exception:
+        return False
 
 
 # ----------------------------
-# ROUTING WEIGHTS (mode preference)
+# EDGE WEIGHTS
 # ----------------------------
-TRAIL_HIGHWAYS = {"path", "footway", "track", "bridleway", "cycleway"}
-ROAD_HIGHWAYS = {"residential", "tertiary", "secondary", "primary", "service", "unclassified", "living_street"}
-
-TRAIL_SURFACES = {"dirt", "gravel", "ground", "unpaved", "fine_gravel", "compacted", "earth", "mud", "sand"}
-PAVED_SURFACES = {"asphalt", "concrete", "paving_stones", "cobblestone", "sett", "paved"}
+TRAIL_HIGHWAYS  = {"path", "footway", "track", "bridleway", "cycleway"}
+ROAD_HIGHWAYS   = {"residential", "tertiary", "secondary", "primary",
+                   "service", "unclassified", "living_street"}
+TRAIL_SURFACES  = {"dirt", "gravel", "ground", "unpaved", "fine_gravel",
+                   "compacted", "earth", "mud", "sand"}
+PAVED_SURFACES  = {"asphalt", "concrete", "paving_stones", "cobblestone", "sett", "paved"}
 
 
 def edge_score(d, mode: str) -> float:
-    highway = d.get("highway", "")
-    if isinstance(highway, list):
-        highway = highway[0] if highway else ""
-    surface = (d.get("surface") or "").lower()
+    hw = d.get("highway", "")
+    if isinstance(hw, list):
+        hw = hw[0] if hw else ""
+    surf = (d.get("surface") or "").lower()
 
-    # 0 = bad, 1 = good
     if mode == "trail":
-        score = 0.0
-        if highway in TRAIL_HIGHWAYS:
-            score = 0.7
-        if surface in TRAIL_SURFACES:
-            score = max(score, 1.0)
-        if surface in PAVED_SURFACES:
-            score = min(score, 0.2)
-        return score
+        s = 0.7 if hw in TRAIL_HIGHWAYS else 0.0
+        if surf in TRAIL_SURFACES: s = max(s, 1.0)
+        if surf in PAVED_SURFACES: s = min(s, 0.2)
+        return s
 
     if mode == "road":
-        score = 0.0
-        if highway in ROAD_HIGHWAYS:
-            score = 0.7
-        if surface in PAVED_SURFACES:
-            score = max(score, 1.0)
-        if highway in TRAIL_HIGHWAYS and surface in TRAIL_SURFACES:
-            score = min(score, 0.2)
-        return score
+        s = 0.7 if hw in ROAD_HIGHWAYS else 0.0
+        if surf in PAVED_SURFACES: s = max(s, 1.0)
+        if hw in TRAIL_HIGHWAYS and surf in TRAIL_SURFACES: s = min(s, 0.2)
+        return s
 
-    # ✅ GREEN: use real polygon intersection precomputed on edges
+    # green: use precomputed polygon flag
     return float(d.get("_green", 0.0))
 
 
-def apply_mode_weights(G, mode: str, strength: float = 0.65, noise: float = 0.03):
+def apply_mode_weights(G, mode: str, strength: float = 0.70, noise: float = 0.12):
     """
-    Lower weight = preferred.
-    weight = length * multiplier
-    multiplier in roughly [1-strength, 1+strength]
+    Noise raised from 3 % → 12 % so the 3 candidates generated per
+    request are meaningfully different from each other.
     """
     for u, v, k, d in G.edges(keys=True, data=True):
         length = float(d.get("length", 1.0))
@@ -304,247 +278,397 @@ def apply_mode_weights(G, mode: str, strength: float = 0.65, noise: float = 0.03
         d["weight"] = length * mult
 
 
-def route_length_m(G, route_nodes):
+# ----------------------------
+# ROUTE HELPERS
+# ----------------------------
+def route_length_m(G, nodes) -> float:
     total = 0.0
-    for u, v in zip(route_nodes[:-1], route_nodes[1:]):
+    for u, v in zip(nodes[:-1], nodes[1:]):
         data = G.get_edge_data(u, v)
         if not data:
             continue
-
-        # MultiDiGraph: choose shortest edge
         if isinstance(data, dict):
-            total += min(d.get("length", 0.0) for d in data.values())
+            total += min(dd.get("length", 0.0) for dd in data.values())
         else:
             total += data.get("length", 0.0)
+    return total
 
-    return float(total)
 
-
-def make_used_edge_set(route_nodes):
-    used = set(zip(route_nodes, route_nodes[1:]))
-    used |= set((b, a) for (a, b) in used)
+def make_used_edge_set(nodes):
+    used = set(zip(nodes, nodes[1:]))
+    used |= {(b, a) for a, b in used}
     return used
 
 
-# ----------------------------
-# LOOP SEARCH (generate EXACTLY N candidates)
-# ----------------------------
-def compute_radius_loop(distance_km: float):
-    if distance_km <= 0:
-        return 1500
-
-    # r ≈ dist/(2π), add slack
-    r = (distance_km * 1000.0) / (2.0 * math.pi)
-    r *= 2.0
-
-    # ✅ increase cap so “green” mode can actually reach parks for 8–15km
-    return int(min(max(r, 2500), 12000))
+def route_fingerprint(nodes, bins: int = 20) -> tuple:
+    """Cheap dedup: sample ~20 evenly-spaced nodes."""
+    if not nodes:
+        return ()
+    step = max(1, len(nodes) // bins)
+    return tuple(nodes[::step])
 
 
-def build_loop_candidates(G, start_node: int, target_m: float, count: int = 3):
+def compute_radius(distance_km: float) -> int:
     """
-    Build up to `count` candidate loops quickly.
-    Strategy:
-      - choose random waypoint distances around ~40-70% of target
-      - go out shortest path by weight
-      - come back with penalized overlap using callable weight (no G.copy)
+    A loop of D km sits in a circle of radius ≈ D/π km.
+    We apply a 1.7× slack factor so detours and green areas are reachable.
+    Previous code used 2× but also capped too low (12 km), cutting off
+    longer routes. New cap is 16 km.
     """
-    try:
-        dists = nx.single_source_dijkstra_path_length(G, start_node, weight="weight")
-    except Exception:
-        return []
+    r = (distance_km * 1000.0 / math.pi) * 1.7
+    return int(min(max(r, 2500), 16_000))
 
-    lo = target_m * 0.35
-    hi = target_m * 0.70
 
-    candidates = [n for n, dd in dists.items() if lo <= dd <= hi]
-    if not candidates:
-        candidates = sorted(dists.keys(), key=lambda n: abs(dists[n] - target_m * 0.5))[:800]
+# ----------------------------
+# BATCHED ELEVATION  (1 API call for all routes)
+# ----------------------------
+def elevation_gain_batch(all_coords_list: list[list]) -> list[int]:
+    """
+    Fetches elevation for all candidate routes in a SINGLE Google API call
+    (or two if the total sample count exceeds 512).
 
-    random.shuffle(candidates)
+    Old code made up to 3 separate calls; this makes at most ceil(N/512).
+    """
+    MAX_PER_ROUTE = 100   # sample points per route
+    MAX_LOCATIONS = 512   # Google hard limit per request
 
-    out = []
-    tries = 0
-    max_tries = 1800  # a bit higher; still bounded
+    route_ranges: list = []
+    flat: list = []
 
-    while candidates and len(out) < count and tries < max_tries:
-        tries += 1
-        waypoint = candidates.pop()
+    for coords in all_coords_list:
+        if not coords:
+            route_ranges.append(None)
+            continue
+        n = len(coords)
+        step = max(1, n // MAX_PER_ROUTE)
+        sampled = coords[::step]
+        if sampled[-1] != coords[-1]:
+            sampled = sampled + [coords[-1]]
+        start = len(flat)
+        flat.extend(sampled)
+        route_ranges.append((start, len(flat)))
+
+    if not flat:
+        return [0] * len(all_coords_list)
+
+    # ---- one (or two) HTTP requests ----
+    all_elevs: list[float] = []
+    for i in range(0, len(flat), MAX_LOCATIONS):
+        batch = flat[i : i + MAX_LOCATIONS]
+        loc_str = "|".join(f"{lat},{lng}" for lat, lng in batch)
+        try:
+            rv = requests.get(
+                "https://maps.googleapis.com/maps/api/elevation/json",
+                params={"locations": loc_str, "key": GOOGLE_ELEVATION_KEY},
+                timeout=25,
+                verify=certifi.where(),
+            )
+            data = rv.json()
+            if data.get("status") == "OK":
+                all_elevs.extend(r["elevation"] for r in data["results"])
+            else:
+                all_elevs.extend([0.0] * len(batch))
+        except Exception:
+            all_elevs.extend([0.0] * len(batch))
+
+    # ---- compute gain per route ----
+    results: list[int] = []
+    for info in route_ranges:
+        if info is None:
+            results.append(0)
+            continue
+        s, e = info
+        elevs = all_elevs[s:e]
+        gain = sum(max(0.0, elevs[j] - elevs[j - 1]) for j in range(1, len(elevs)))
+        results.append(int(round(gain)))
+
+    return results
+
+
+# ----------------------------
+# ANGULAR-SECTOR LOOP BUILDER
+# ----------------------------
+def build_loop_candidates(
+    G,
+    start_node: int,
+    start_lat: float,
+    start_lng: float,
+    target_m: float,
+    count: int = 3,
+) -> list:
+    """
+    Generates `count` structurally distinct loops by placing the turning
+    waypoint in evenly-spaced compass sectors.
+
+    Each sector gets multiple distance attempts so a single bad distance
+    no longer silently drops a route — old code only tried once per sector,
+    which caused 2-route results whenever one quality gate check failed.
+    """
+    # Rotate sector grid per request for variety
+    base_offset = random.uniform(0, 360 / count)
+    sector_bearings = [(base_offset + i * 360 / count) % 360 for i in range(count)]
+
+    # Multiple distance fractions to try within each sector (near→far).
+    # If the first distance fails the quality gate or path search, we retry
+    # with the next one before giving up on the sector entirely.
+    DIST_FRACS = [0.48, 0.43, 0.54, 0.38, 0.60, 0.35, 0.65]
+
+    candidates: list = []
+    seen_fps: set = set()
+
+    # Two-pass quality gates.
+    # Pass 1: tight (75–125 %) — gives routes close to the requested distance.
+    # Pass 2: loose (65–140 %) — fallback for sectors where the street grid
+    #          makes a tight-fit route impossible (dense areas, dead-ends, etc.).
+    # A sector only advances to pass 2 if pass 1 found nothing for it.
+    GATES = [
+        (0.75, 1.25),   # pass 1 — tight
+        (0.65, 1.40),   # pass 2 — loose fallback
+    ]
+
+    for gate_lo, gate_hi in GATES:
+        for bearing in sector_bearings:
+            # Skip sectors that already have a candidate from an earlier pass
+            sector_idx = sector_bearings.index(bearing)
+            if len(candidates) > sector_idx:
+                continue
+
+            for dist_frac in DIST_FRACS:
+                wp_dist = target_m * dist_frac
+                wp_lat, wp_lng = offset_point(start_lat, start_lng, bearing, wp_dist)
+
+                try:
+                    waypoint = ox.nearest_nodes(G, wp_lng, wp_lat)
+                except Exception:
+                    continue
+
+                if waypoint == start_node:
+                    continue
+
+                try:
+                    out = nx.shortest_path(G, start_node, waypoint, weight="weight")
+                except Exception:
+                    continue
+
+                used = make_used_edge_set(out)
+
+                def penalized(u, v, d, _used=used):
+                    w = float(d.get("weight", d.get("length", 1.0)))
+                    return w * 2.5 if (u, v) in _used else w
+
+                try:
+                    back = nx.shortest_path(G, waypoint, start_node, weight=penalized)
+                except Exception:
+                    continue
+
+                full = out + back[1:]
+                length_m = route_length_m(G, full)
+
+                if not (gate_lo * target_m <= length_m <= gate_hi * target_m):
+                    continue
+
+                fp = route_fingerprint(full)
+                if fp in seen_fps:
+                    continue
+                seen_fps.add(fp)
+
+                candidates.append((full, length_m))
+                break  # found one for this sector, move on
+
+        if len(candidates) >= count:
+            break  # all sectors filled, no need for the loose pass
+
+    return candidates
+
+
+# ----------------------------
+# ANGULAR-SECTOR P2P BUILDER
+# ----------------------------
+def build_point_to_point_candidates(
+    G,
+    start_node: int,
+    end_node: int,
+    start_lat: float,
+    start_lng: float,
+    end_lat: float,
+    end_lng: float,
+    target_m: float,
+    count: int = 3,
+) -> list:
+    """
+    Builds diverse P2P routes by swinging detours left, centre, right of
+    the start→end bearing instead of randomising waypoints from a flat list.
+    """
+    bearing = math.degrees(
+        math.atan2(end_lng - start_lng, end_lat - start_lat)
+    ) % 360
+
+    # Left / straight / right relative to the start→end direction
+    offsets = [-70, 0, 70]
+    detour_dist = target_m * 0.32
+
+    candidates: list = []
+    seen: set = set()
+
+    for off in offsets:
+        angle = (bearing + off) % 360
+        dist = detour_dist * (0.5 if off == 0 else 1.0)
+        wp_lat, wp_lng = offset_point(start_lat, start_lng, angle, dist)
 
         try:
-            out_route = nx.shortest_path(G, start_node, waypoint, weight="weight")
+            wp_node = ox.nearest_nodes(G, wp_lng, wp_lat)
         except Exception:
             continue
 
-        used = make_used_edge_set(out_route)
-
-        def penalized_weight(u, v, d):
-            w = float(d.get("weight", d.get("length", 1.0)))
-            if (u, v) in used:
-                return w * 5.0
-            return w
-
         try:
-            back_route = nx.shortest_path(G, waypoint, start_node, weight=penalized_weight)
-        except Exception:
-            continue
-
-        full = out_route + back_route[1:]
-        length_m = route_length_m(G, full)
-
-        # keep only roughly reasonable loops (avoid tiny/huge)
-        if 0.60 * target_m <= length_m <= 1.55 * target_m:
-            out.append((full, length_m))
-
-    return out
-
-
-def build_point_to_point_candidates(G, start_node: int, end_node: int, target_m: float, count: int = 3):
-    """
-    Build up to `count` point-to-point routes.
-    Strategy:
-      1) base shortest path start->end
-      2) if too short vs target, add waypoint detours and re-route
-    """
-    out = []
-
-    try:
-        base = nx.shortest_path(G, start_node, end_node, weight="weight")
-        base_len = route_length_m(G, base)
-        out.append((base, base_len))
-    except Exception:
-        return out
-
-    # If base already near target, return it (and maybe slight variants)
-    if base_len >= 0.80 * target_m:
-        return out[:count]
-
-    # Need detours: pick waypoint nodes that are "off to the side"
-    try:
-        dists_from_start = nx.single_source_dijkstra_path_length(G, start_node, weight="weight")
-    except Exception:
-        return out[:count]
-
-    # look for nodes around ~40–70% of target from start (gives room for detour)
-    lo = target_m * 0.35
-    hi = target_m * 0.70
-    candidates = [n for n, dd in dists_from_start.items() if lo <= dd <= hi]
-    random.shuffle(candidates)
-
-    tries = 0
-    max_tries = 1200
-
-    used_paths = set()
-
-    while candidates and len(out) < count and tries < max_tries:
-        tries += 1
-        wp = candidates.pop()
-
-        try:
-            p1 = nx.shortest_path(G, start_node, wp, weight="weight")
-            p2 = nx.shortest_path(G, wp, end_node, weight="weight")
+            p1 = nx.shortest_path(G, start_node, wp_node, weight="weight")
+            p2 = nx.shortest_path(G, wp_node, end_node, weight="weight")
         except Exception:
             continue
 
         full = p1 + p2[1:]
-        key = tuple(full[:50])  # cheap dedupe
-        if key in used_paths:
-            continue
-        used_paths.add(key)
-
         length_m = route_length_m(G, full)
 
-        # Accept if within a sane window of target
-        if 0.65 * target_m <= length_m <= 1.55 * target_m:
-            out.append((full, length_m))
+        if not (0.75 * target_m <= length_m <= 1.25 * target_m):
+            continue
 
-    return out[:count]
+        fp = route_fingerprint(full)
+        if fp in seen:
+            continue
+        seen.add(fp)
+
+        candidates.append((full, length_m))
+
+    # Fallback: direct route if all detours failed
+    if not candidates:
+        try:
+            direct = nx.shortest_path(G, start_node, end_node, weight="weight")
+            candidates.append((direct, route_length_m(G, direct)))
+        except Exception:
+            pass
+
+    return candidates[:count]
 
 
 # ----------------------------
-# /generate3 (returns 3 routes, pick best by elevation)
+# BEST ROUTE SELECTOR
+# ----------------------------
+def pick_best_index(routes: list, elevation_target: Optional[float]) -> int:
+    """
+    Old code always picked highest elevation.
+    Now: if the user set an elevation target, pick the route closest to it;
+    otherwise fall back to highest elevation.
+    """
+    if not routes:
+        return 0
+    if elevation_target and elevation_target > 0:
+        return min(range(len(routes)),
+                   key=lambda i: abs(routes[i]["elevation_gain_m"] - elevation_target))
+    return max(range(len(routes)), key=lambda i: routes[i]["elevation_gain_m"])
+
+
+# ----------------------------
+# /generate3
 # ----------------------------
 @app.post("/generate3")
 def generate3(req: Generate3Request):
-    start_time = time.time()
+    t0 = time.time()
 
     if req.prefer not in ("green", "trail", "road"):
         req.prefer = "trail"
 
-    # randomness per request -> different routes
-    random.seed(time.time_ns())
+    random.seed(time.time_ns())  # fresh randomness per request
 
     target_m = req.distance_km * 1000.0
+
     if req.mode == "loop_in_area":
         center_lat, center_lng = req.center_lat, req.center_lng
     else:
-        # loop_from_start / point_to_point use start as the center for graph download
         center_lat, center_lng = req.start_lat, req.start_lng
 
-    center = (center_lat, center_lng)
-    radius = compute_radius_loop(req.distance_km)
+    radius = compute_radius(req.distance_km)
 
+    # ---- download / fetch graph ----
     try:
-        G0 = get_graph_cached(center[0], center[1], radius)
+        G0 = get_graph_cached(center_lat, center_lng, radius)
         G = G0.copy()
     except Exception as e:
         return {"success": False, "error": f"Could not download OSM graph: {e}", "routes": []}
 
-    # ✅ real green polygons if prefer=green
+    # ---- green polygons ----
     green_union = None
     if req.prefer == "green":
-        green_union = get_green_union_cached(center[0], center[1], radius)
+        green_union = get_green_union_cached(_round3(center_lat), _round3(center_lng), radius)
         mark_green_edges(G, green_union)
 
-    apply_mode_weights(G, req.prefer, strength=0.70 if req.prefer == "green" else 0.65, noise=0.03)
+    apply_mode_weights(G, req.prefer, strength=0.70, noise=0.12)
 
-    # ✅ start inside a green polygon if possible (otherwise near center)
+    # ---- start node ----
     start_node = pick_start_node(G, center_lat, center_lng, req.prefer, green_union)
+    sn = G.nodes[start_node]
+    start_lat_actual, start_lng_actual = sn["y"], sn["x"]
 
-
+    # ---- build candidates ----
     if req.mode == "point_to_point":
         if req.end_lat is None or req.end_lng is None:
             return {"success": False, "error": "end_lat/end_lng required for point_to_point", "routes": []}
-
         end_node = ox.nearest_nodes(G, req.end_lng, req.end_lat)
-
-        candidates = build_point_to_point_candidates(G, start_node, end_node, target_m, count=req.n_routes)
+        candidates = build_point_to_point_candidates(
+            G, start_node, end_node,
+            start_lat_actual, start_lng_actual,
+            req.end_lat, req.end_lng,
+            target_m, count=req.n_routes,
+        )
     else:
-        candidates = build_loop_candidates(G, start_node, target_m, count=req.n_routes)
+        candidates = build_loop_candidates(
+            G, start_node,
+            start_lat_actual, start_lng_actual,
+            target_m, count=req.n_routes,
+        )
 
     if not candidates:
-        return {"success": False, "error": "Could not build route candidates. Try different distance/points.", "routes": []}
+        return {
+            "success": False,
+            "error": (
+                f"Could not build route candidates for {req.distance_km} km in this area. "
+                "Try a different location, distance, or preference."
+            ),
+            "routes": [],
+        }
 
-    routes_out = []
-    best_idx = 0
-    best_elev = -1
+    # ---- batch elevation (ONE API call) ----
+    all_coords = [
+        [(G.nodes[n]["y"], G.nodes[n]["x"]) for n in nodes]
+        for nodes, _ in candidates
+    ]
+    all_elevations = elevation_gain_batch(all_coords)
 
-    # Elevation for each candidate (<=3 API calls)
-    for i, (nodes, length_m) in enumerate(candidates):
-        coords = [(G.nodes[n]["y"], G.nodes[n]["x"]) for n in nodes]
-        elev = elevation_gain(coords)
-
-        if elev > best_elev:
-            best_elev = elev
-            best_idx = i
-
-        routes_out.append({
+    routes_out = [
+        {
             "distance_km": round(length_m / 1000.0, 2),
             "elevation_gain_m": elev,
-            "coordinates": coords
-        })
+            "coordinates": coords,
+        }
+        for ((_nodes, length_m), elev, coords) in zip(candidates, all_elevations, all_coords)
+    ]
 
-    print(f"[TrailForgeX] generate3 done in {time.time()-start_time:.2f}s radius={radius} routes={len(routes_out)} prefer={req.prefer}")
+    best_idx = pick_best_index(routes_out, req.elevation_gain_target)
+
+    print(
+        f"[TrailForgeX] generate3 {time.time()-t0:.2f}s | "
+        f"radius={radius}m | routes={len(routes_out)} | "
+        f"prefer={req.prefer} | mode={req.mode}"
+    )
+
     return {"success": True, "best_index": best_idx, "routes": routes_out}
 
 
 # ----------------------------
-# /generate (keeps old behavior but uses generate3 and returns BEST)
+# /generate  (legacy — delegates to generate3)
 # ----------------------------
 @app.post("/generate")
 def generate(req: RouteRequest):
     mode = "point_to_point" if (req.end_lat is not None and req.end_lng is not None) else "loop_from_start"
-
     g3 = Generate3Request(
         distance_km=req.distance_km,
         elevation_gain_target=req.elevation_gain_target,
@@ -554,12 +678,9 @@ def generate(req: RouteRequest):
         start_lng=req.start_lng,
         end_lat=req.end_lat,
         end_lng=req.end_lng,
-        mode=mode
+        mode=mode,
     )
-
     data = generate3(g3)
     if not data.get("success"):
         return {"error": data.get("error", "Failed to generate route.")}
-
-    best = data["routes"][data["best_index"]]
-    return best
+    return data["routes"][data["best_index"]]
