@@ -1,6 +1,8 @@
 <?php
 $AUTH_PAGE_NAME = 'record';
 require_once __DIR__ . '/includes/auth_guard.php';
+
+include __DIR__ . '/includes/navbar.php';
 ?>
 
 <!DOCTYPE html>

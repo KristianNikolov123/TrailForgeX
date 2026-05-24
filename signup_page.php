@@ -68,16 +68,16 @@ if (!preg_match('/^[a-zA-Z0-9_\-\/]+\.php$/', $next)) $next = 'index.php';
     </div> 
   </main>
 
-  <div id="verifyModal" class="modal" style="display:none;">
-    <div class="modal-content">
-      <h2>Verify your email</h2>
-      <p>Enter the 6-digit code sent to your email.</p>
-
-      <input type="text" id="verifyCodeInput" maxlength="6" placeholder="123456">
-
-      <button id="verifySubmitBtn">Verify</button>
-
-      <div id="verifyError" style="color:red;margin-top:10px;"></div>
+  <div id="verifyModal" class="verify-modal">
+    <div class="verify-modal-card">
+      <span class="verify-modal-icon">📧</span>
+      <h2 class="verify-modal-title">Verify your email</h2>
+      <p class="verify-modal-sub">Enter the 6-digit code we sent to your email address.</p>
+      <input type="text" id="verifyCodeInput" class="verify-code-input"
+            maxlength="6" placeholder="· · · · · ·"
+            inputmode="numeric" autocomplete="one-time-code">
+      <button id="verifySubmitBtn" class="verify-submit-btn">Verify</button>
+      <div id="verifyError" class="verify-error"></div>
     </div>
   </div>
   <script src="main.js"></script>

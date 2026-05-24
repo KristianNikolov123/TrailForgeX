@@ -2,13 +2,19 @@
 require_once '../../includes/bootstrap.php';
 require_once '../../includes/dbconn.php';
 
-$data = json_decode(file_get_contents('php://input'), true);
-$code = trim($data['code'] ?? '');
-
-$user_id = $_SESSION['pending_verify_user_id'] ?? null;
+$data    = json_decode(file_get_contents('php://input'), true);
+$code    = trim($data['code'] ?? '');
+$user_id = (int)($data['pending_user_id']           // from JS
+          ?? $_SESSION['pending_verify_user_id']     // fallback (Google flow etc.)
+          ?? 0);
 
 if (!$user_id || !$code) {
-    echo json_encode(['success'=>false,'error'=>'Invalid request']);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Invalid request',
+        'debug_session_id' => session_id(),          // add this
+        'debug_session' => $_SESSION               // add this
+    ]);
     exit;
 }
 

@@ -1703,10 +1703,12 @@ if (registerForm) {
 
     // ✅ NEW LOGIC
     if (data.verify_required) {
+      window._pendingVerifyUserId = data.pending_user_id; // store it
       const modal = document.getElementById('verifyModal');
       if (modal) modal.style.display = 'flex';
       return;
-    }
+  }
+  
 
     // fallback (should not happen)
     window.location.href = 'index.php';
@@ -1714,25 +1716,22 @@ if (registerForm) {
 }
 
 
-const verifyBtn = document.getElementById('verifySubmitBtn');
-
-verifyBtn?.addEventListener('click', async () => {
-  const code = document.getElementById('verifyCodeInput').value.trim();
-
-  const resp = await fetch('api/auth/verify.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code })
-  });
-
-  const data = await resp.json();
-
-  if (!data.success) {
-    document.getElementById('verifyError').textContent = data.error;
-    return;
-  }
-
-  window.location.href = 'index.php';
+document.getElementById('verifySubmitBtn')?.addEventListener('click', async () => {
+    const code = document.getElementById('verifyCodeInput').value.trim();
+    const resp = await fetch('api/auth/verify.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            code,
+            pending_user_id: window._pendingVerifyUserId  // send it
+        }),
+    });
+    const data = await resp.json();
+    if (!data.success) {
+        document.getElementById('verifyError').textContent = data.error;
+        return;
+    }
+    window.location.href = 'index.php';
 });
 
 // --- Appended: UI JS for Trails/Favs/Share (for new features only) ---

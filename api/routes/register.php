@@ -1,7 +1,7 @@
 <?php
+require_once __DIR__ . '/../../includes/bootstrap.php';
 require_once __DIR__ . '/../../includes/mailer.php';
 require_once __DIR__ . '/../../includes/dbconn.php';
-require_once __DIR__ . '/../../includes/bootstrap.php';
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -65,10 +65,10 @@ if ($result !== true) {
 
 mysqli_close($connection);
 
-$_SESSION['pending_verify_user_id'] = $user_id;
-
+$_SESSION['pending_verify_user_id'] = $user_id; // keep for safety
 echo json_encode([
-    'success' => true,
-    'verify_required' => true
+    'success'        => true,
+    'verify_required' => true,
+    'pending_user_id' => $user_id,   // ← add this
 ]);
 exit;
